@@ -25,10 +25,10 @@
 //
 // damageType uses DamageEffectType's values (Unit.h:253). Only two call shapes populate absorb
 // correctly on this tree; everything else must read UNKNOWN rather than zero:
-//   normal direct spell  CleanDamage + spell     (Unit.cpp:1678)                   -> known
-//   normal melee         CleanDamage + no spell  (Unit.cpp:2088)                   -> known
-//   damage shield        spell, NO CleanDamage   (Unit.cpp:2198)                   -> unknown
-//   direct split damage  spell + zeroed absorb   (Unit.cpp:2609, :2682)            -> unknown
+//   normal direct spell  CleanDamage + spell     (Unit.cpp:1685)                   -> known
+//   normal melee         CleanDamage + no spell  (Unit.cpp:2095)                   -> known
+//   damage shield        spell, NO CleanDamage   (Unit.cpp:2205)                   -> unknown
+//   direct split damage  spell + zeroed absorb   (Unit.cpp:2616, :2689)            -> unknown
 //   periodic             CleanDamage(0,0,...)    (SpellAuraEffects.cpp:6323,:6444) -> unknown
 inline bool AzDamageAbsorbKnown(int damageType, bool hasCleanDamage, bool hasSpell)
 {
