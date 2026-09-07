@@ -1000,9 +1000,9 @@ uint32 Unit::DealDamage(Unit* attacker, Unit* victim, uint32 damage, CleanDamage
     sScriptMgr->OnDamage(attacker, victim, damage);
 
     // AzMeter observer. Absorb is only trustworthy on the two shapes that actually
-    // populate CleanDamage: a normal direct spell (:1678) and normal melee
-    // (:2088). A damage shield passes no CleanDamage (:2198) and direct
-    // split damage passes a misleading zero (:2609, :2682), so both read unknown.
+    // populate CleanDamage: a normal direct spell (:1685) and normal melee
+    // (:2095). A damage shield passes no CleanDamage (:2205) and direct
+    // split damage passes a misleading zero (:2616, :2689), so both read unknown.
     {
         // The SAME inline the host test includes. Re-typing the boolean here would leave the test
         // proving a copy while the shipped core ran something else -- passing forever while the
