@@ -1,3 +1,20 @@
+/*
+ * This file is part of the AzerothCore Project. See AUTHORS file for Copyright information
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
+ * more details.
+ *
+ * You should have received a copy of the GNU General Public License along
+ * with this program. If not, see <http://www.gnu.org/licenses/>.
+ */
+
 #ifndef AZ_DAMAGE_ABSORB_KNOWN_H
 #define AZ_DAMAGE_ABSORB_KNOWN_H
 
@@ -8,10 +25,10 @@
 //
 // damageType uses DamageEffectType's values (Unit.h:253). Only two call shapes populate absorb
 // correctly on this tree; everything else must read UNKNOWN rather than zero:
-//   normal direct spell  CleanDamage + spell     (Unit.cpp:1661-1663)              -> known
-//   normal melee         CleanDamage + no spell  (Unit.cpp:2071-2073)              -> known
-//   damage shield        spell, NO CleanDamage   (Unit.cpp:2163-2183)              -> unknown
-//   direct split damage  spell + zeroed absorb   (Unit.cpp:2631-2667)              -> unknown
+//   normal direct spell  CleanDamage + spell     (Unit.cpp:1678)                   -> known
+//   normal melee         CleanDamage + no spell  (Unit.cpp:2088)                   -> known
+//   damage shield        spell, NO CleanDamage   (Unit.cpp:2198)                   -> unknown
+//   direct split damage  spell + zeroed absorb   (Unit.cpp:2609, :2682)            -> unknown
 //   periodic             CleanDamage(0,0,...)    (SpellAuraEffects.cpp:6323,:6444) -> unknown
 inline bool AzDamageAbsorbKnown(int damageType, bool hasCleanDamage, bool hasSpell)
 {
