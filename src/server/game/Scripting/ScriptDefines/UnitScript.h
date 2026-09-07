@@ -44,6 +44,7 @@ enum UnitHook
     UNITHOOK_ON_UNIT_EXIT_COMBAT,
     UNITHOOK_ON_UNIT_DEATH,
     UNITHOOK_ON_UNIT_SET_SHAPESHIFT_FORM,
+    UNITHOOK_ON_DAMAGE_SPELL,
     UNITHOOK_END
 };
 
@@ -62,6 +63,14 @@ public:
 
     // Called when a unit deals damage to another unit
     virtual void OnDamage(Unit* /*attacker*/, Unit* /*victim*/, uint32& /*damage*/) { }
+
+    // Called when a unit deals damage, carrying the spell and mitigation context that
+    // OnDamage drops. Observational: damage is BY VALUE so a consumer cannot alter
+    // gameplay. absorbKnown=false means absorb was not forwarded on this path -- it does
+    // NOT mean zero was absorbed.
+    virtual void OnDamageSpell(Unit* /*attacker*/, Unit* /*victim*/, uint32 /*damage*/,
+                               SpellInfo const* /*spellInfo*/, DamageEffectType /*damageType*/,
+                               uint32 /*absorbed*/, bool /*absorbKnown*/) { }
 
     // Called when DoT's Tick Damage is being Dealt
     // Attacker can be nullptr if he is despawned while the aura still exists on target
