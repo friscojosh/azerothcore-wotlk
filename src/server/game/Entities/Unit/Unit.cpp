@@ -34,6 +34,7 @@
 #include "Creature.h"
 #include "CreatureAIImpl.h"
 #include "CreatureGroups.h"
+#include "DamageAbsorbKnown.h"
 #include "DisableMgr.h"
 #include "DynamicVisibility.h"
 #include "Errors.h"
@@ -997,6 +998,20 @@ uint32 Unit::DealDamage(Unit* attacker, Unit* victim, uint32 damage, CleanDamage
 
     // Hook for OnDamage Event
     sScriptMgr->OnDamage(attacker, victim, damage);
+
+    // AzMeter observer. Absorb is only trustworthy on the two shapes that actually
+    // populate CleanDamage: a normal direct spell (:1661-1663) and normal melee
+    // (:2071-2073). A damage shield passes no CleanDamage (:2163-2183) and direct
+    // split damage passes a misleading zero (:2631-2667), so both read unknown.
+    {
+        // The SAME inline the host test includes. Re-typing the boolean here would leave the test
+        // proving a copy while the shipped core ran something else -- passing forever while the
+        // product is wrong.
+        bool const absorbKnown = AzDamageAbsorbKnown(
+            static_cast<int>(damagetype), cleanDamage != nullptr, spellProto != nullptr);
+        sScriptMgr->OnDamageSpell(attacker, victim, damage, spellProto, damagetype,
+                                  cleanDamage ? cleanDamage->absorbed_damage : 0, absorbKnown);
+    }
 
     // Signal to pets that their owner was attacked - except when DOT.
     if (attacker != victim && damagetype != DOT)
