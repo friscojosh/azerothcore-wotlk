@@ -121,6 +121,7 @@ void WorldConfig::BuildConfigCache()
     SetConfigValue<float>(RATE_ARENA_POINTS_2V2, "Rate.ArenaPoints2v2", 0.76f);
     SetConfigValue<float>(RATE_ARENA_POINTS_3V3, "Rate.ArenaPoints3v3", 0.88f);
     SetConfigValue<float>(RATE_INSTANCE_RESET_TIME, "Rate.InstanceResetTime", 1.0f);
+    SetConfigValue<float>(RATE_INSTANCE_RESET_TIME_DUNGEON, "Rate.InstanceResetTime.Dungeon", 1.0f);
 
     SetConfigValue<float>(RATE_MISS_CHANCE_MULTIPLIER_TARGET_CREATURE, "Rate.MissChanceMultiplier.TargetCreature", 11.0f);
     SetConfigValue<float>(RATE_MISS_CHANCE_MULTIPLIER_TARGET_PLAYER, "Rate.MissChanceMultiplier.TargetPlayer", 7.0f);

@@ -245,6 +245,29 @@ bool InstanceSave::RemovePlayer(ObjectGuid guid, InstanceSaveMgr* ism)
     return deleteSave;
 }
 
+namespace
+{
+    // Raids and non-raid (5-man heroic) dungeons take SEPARATE reset multipliers.
+    //
+    // Upstream applies one rate to both, so raising the heroic reset interval also multiplied
+    // every raid lockout by the same factor. On a solo/playerbot server that is the difference
+    // between "cleared trash stays dead" and "ICC will not re-open for seven weeks".
+    //
+    // Both rates default to 1.0f, so an unset config reproduces upstream behaviour exactly.
+    // A map we cannot look up falls back to the RAID rate, i.e. upstream's single-rate path.
+    //
+    // Used by BOTH LoadResetTimes() (startup) and _ResetOrWarnAll() (each reset). They must agree:
+    // if startup computed a period with one rate and the reset used another, the schedule and the
+    // stored reset time would disagree. Hence one helper rather than the branch written twice.
+    float GetInstanceResetRate(uint32 mapid)
+    {
+        MapEntry const* mapEntry = sMapStore.LookupEntry(mapid);
+        return (mapEntry && !mapEntry->IsRaid())
+             ? sWorld->getRate(RATE_INSTANCE_RESET_TIME_DUNGEON)
+             : sWorld->getRate(RATE_INSTANCE_RESET_TIME);
+    }
+}
+
 void InstanceSaveMgr::SanitizeInstanceSavedData()
 {
     CharacterDatabasePreparedStatement* stmt = CharacterDatabase.GetPreparedStatement(CHAR_SANITIZE_INSTANCE_SAVED_DATA);
@@ -341,7 +364,7 @@ void InstanceSaveMgr::LoadResetTimes()
             continue;
 
         // the reset_delay must be at least one day
-        uint32 period = uint32(((mapDiff->resetTime * sWorld->getRate(RATE_INSTANCE_RESET_TIME)) / DAY) * DAY);
+        uint32 period = uint32(((mapDiff->resetTime * GetInstanceResetRate(mapid)) / DAY) * DAY);
         if (period < DAY)
             period = DAY;
 
@@ -734,7 +757,7 @@ void InstanceSaveMgr::_ResetOrWarnAll(uint32 mapid, Difficulty difficulty, bool 
         // calculate the next reset time
         uint32 diff = sWorld->getIntConfig(CONFIG_INSTANCE_RESET_TIME_HOUR) * HOUR;
 
-        uint32 period = uint32(((mapDiff->resetTime * sWorld->getRate(RATE_INSTANCE_RESET_TIME)) / DAY) * DAY);
+        uint32 period = uint32(((mapDiff->resetTime * GetInstanceResetRate(mapid)) / DAY) * DAY);
         if (period < DAY)
             period = DAY;
 
