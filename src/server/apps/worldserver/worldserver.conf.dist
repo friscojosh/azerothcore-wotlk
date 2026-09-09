@@ -3362,6 +3362,20 @@ Instance.ResetTimeRelativeTimestamp = 1135814400
 Rate.InstanceResetTime = 1
 
 #
+#    Rate.InstanceResetTime.Dungeon
+#        Description: As Rate.InstanceResetTime, but for NON-RAID (5-man heroic) dungeons only.
+#                     Upstream AzerothCore applies a SINGLE rate to raids and heroics together,
+#                     so raising the heroic reset interval also multiplies every raid lockout by
+#                     the same factor. This fork splits them: Rate.InstanceResetTime governs
+#                     RAIDS only, and this setting governs 5-man heroics.
+#                     Both default to 1, which reproduces upstream behaviour exactly.
+#                     As with the raid rate, you must clean instance_reset in the characters db
+#                     for a new value to take effect.
+#        Default:     1
+
+Rate.InstanceResetTime.Dungeon = 1
+
+#
 #    Instance.UnloadDelay
 #        Description: Time (in milliseconds) before instance maps are unloaded from memory if no
 #                     characters are inside.
