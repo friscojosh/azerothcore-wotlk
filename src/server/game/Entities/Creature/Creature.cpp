@@ -1488,6 +1488,19 @@ void Creature::SaveToDB(uint32 mapid, uint8 spawnMask, uint32 phaseMask)
     stmt->SetData(index++, dynamicflags);
     trans->Append(stmt);
 
+    // AzCodex: the INSERT above leaves zoneId/areaId out, so every save (.npc add, .npc move)
+    // resets them to 0. Write them in the same transaction from where the creature now stands.
+    if (FindMap())
+    {
+        uint32 zoneId, areaId;
+        GetZoneAndAreaId(zoneId, areaId);
+        stmt = WorldDatabase.GetPreparedStatement(WORLD_UPD_CREATURE_ZONE_AREA_DATA);
+        stmt->SetData(0, zoneId);
+        stmt->SetData(1, areaId);
+        stmt->SetData(2, m_spawnId);
+        trans->Append(stmt);
+    }
+
     WorldDatabase.CommitTransaction(trans);
     sScriptMgr->OnCreatureSaveToDB(this);
 }

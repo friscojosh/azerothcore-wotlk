@@ -2325,8 +2325,8 @@ void ObjectMgr::LoadCreatures()
     QueryResult result = WorldDatabase.Query("SELECT creature.guid, id, map, equipment_id, position_x, position_y, position_z, orientation, spawntimesecs, wander_distance, "
                          //      10            11       12          13           14         15         16          17             18                 19                    20
                          "currentwaypoint, curhealth, curmana, MovementType, spawnMask, phaseMask, eventEntry, pool_entry, creature.npcflag, creature.unit_flags, creature.dynamicflags, "
-                         //       21
-                         "creature.ScriptName "
+                         //       21                  22
+                         "creature.ScriptName, creature.zoneId "
                          "FROM creature "
                          "LEFT OUTER JOIN game_event_creature ON creature.guid = game_event_creature.guid "
                          "LEFT OUTER JOIN pool_creature ON creature.guid = pool_creature.guid");
@@ -2476,18 +2476,27 @@ void ObjectMgr::LoadCreatures()
             data.phaseMask = 1;
         }
 
-        if (sWorld->getBoolConfig(CONFIG_CALCULATE_CREATURE_ZONE_AREA_DATA))
+        // AzCodex: creature.zoneId is what the codex lists a zone's NPCs by, but nothing fills it for
+        // spawns that arrive by SQL (modules, upstream updates). Backfill any spawn still at zone 0
+        // on every start; only the config option recalculates spawns that already have one. A spawn
+        // that resolves to zone 0 (transports) is left alone so it is not rewritten on every start.
+        bool const calculateAll = sWorld->getBoolConfig(CONFIG_CALCULATE_CREATURE_ZONE_AREA_DATA);
+        bool const zoneMissing  = fields[22].Get<uint32>() == 0;
+        if (calculateAll || zoneMissing)
         {
             uint32 zoneId = sMapMgr->GetZoneId(data.phaseMask, data.mapid, data.posX, data.posY, data.posZ);
             uint32 areaId = sMapMgr->GetAreaId(data.phaseMask, data.mapid, data.posX, data.posY, data.posZ);
 
-            WorldDatabasePreparedStatement* stmt = WorldDatabase.GetPreparedStatement(WORLD_UPD_CREATURE_ZONE_AREA_DATA);
+            if (calculateAll || zoneId)
+            {
+                WorldDatabasePreparedStatement* stmt = WorldDatabase.GetPreparedStatement(WORLD_UPD_CREATURE_ZONE_AREA_DATA);
 
-            stmt->SetData(0, zoneId);
-            stmt->SetData(1, areaId);
-            stmt->SetData(2, spawnId);
+                stmt->SetData(0, zoneId);
+                stmt->SetData(1, areaId);
+                stmt->SetData(2, spawnId);
 
-            WorldDatabase.Execute(stmt);
+                WorldDatabase.Execute(stmt);
+            }
         }
 
         // Add to grid if not managed by the game event. Pooled spawns are in
