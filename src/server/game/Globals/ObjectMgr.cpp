@@ -2934,8 +2934,8 @@ void ObjectMgr::LoadGameobjects()
     QueryResult result = WorldDatabase.Query("SELECT gameobject.guid, id, map, position_x, position_y, position_z, orientation, "
                          //   7          8          9          10         11             12            13     14         15         16          17
                          "rotation0, rotation1, rotation2, rotation3, spawntimesecs, animprogress, state, spawnMask, phaseMask, eventEntry, pool_entry, "
-                         //   18
-                         "ScriptName "
+                         //   18          19
+                         "ScriptName, gameobject.zoneId "
                          "FROM gameobject LEFT OUTER JOIN game_event_gameobject ON gameobject.guid = game_event_gameobject.guid "
                          "LEFT OUTER JOIN pool_gameobject ON gameobject.guid = pool_gameobject.guid");
 
@@ -3090,18 +3090,26 @@ void ObjectMgr::LoadGameobjects()
             data.phaseMask = 1;
         }
 
-        if (sWorld->getBoolConfig(CONFIG_CALCULATE_GAMEOBJECT_ZONE_AREA_DATA))
+        // AzCodex: same backfill as LoadCreatures. gameobject.zoneId is what the codex lists a zone's
+        // objects by; fill any spawn still at zone 0 on every start, and leave one that resolves to
+        // zone 0 (transports) alone. Only the config option recalculates spawns that already have one.
+        bool const calculateAllGo = sWorld->getBoolConfig(CONFIG_CALCULATE_GAMEOBJECT_ZONE_AREA_DATA);
+        bool const goZoneMissing  = fields[19].Get<uint32>() == 0;
+        if (calculateAllGo || goZoneMissing)
         {
             uint32 zoneId = sMapMgr->GetZoneId(data.phaseMask, data.mapid, data.posX, data.posY, data.posZ);
             uint32 areaId = sMapMgr->GetAreaId(data.phaseMask, data.mapid, data.posX, data.posY, data.posZ);
 
-            WorldDatabasePreparedStatement* stmt = WorldDatabase.GetPreparedStatement(WORLD_UPD_GAMEOBJECT_ZONE_AREA_DATA);
+            if (calculateAllGo || zoneId)
+            {
+                WorldDatabasePreparedStatement* stmt = WorldDatabase.GetPreparedStatement(WORLD_UPD_GAMEOBJECT_ZONE_AREA_DATA);
 
-            stmt->SetData(0, zoneId);
-            stmt->SetData(1, areaId);
-            stmt->SetData(2, guid);
+                stmt->SetData(0, zoneId);
+                stmt->SetData(1, areaId);
+                stmt->SetData(2, guid);
 
-            WorldDatabase.Execute(stmt);
+                WorldDatabase.Execute(stmt);
+            }
         }
 
         if (gameEvent == 0)                      // if not this is to be managed by GameEvent System
