@@ -16,6 +16,10 @@
  */
 
 #include "CreatureScript.h"
+#include "GameObject.h"
+#include "GameTime.h"
+#include "Map.h"
+#include "ObjectMgr.h"
 #include "Player.h"
 #include "ScriptedCreature.h"
 #include "blackrock_spire.h"
@@ -101,7 +105,7 @@ enum Events
 
 struct boss_rend_blackhand : public BossAI
 {
-    boss_rend_blackhand(Creature* creature) : BossAI(creature, DATA_WARCHIEF_REND_BLACKHAND) { }
+    boss_rend_blackhand(Creature* creature) : BossAI(creature, DATA_WARCHIEF_REND_BLACKHAND), _gythEvent(false), _currentWave(0) { }
 
     void Reset() override
     {
@@ -165,6 +169,8 @@ struct boss_rend_blackhand : public BossAI
         instance->SetBossState(DATA_GYTH, FAIL);
         BossAI::EnterEvadeMode(why);
         me->DespawnOrUnsummon();
+        // After the despawn, so a balcony Rend's own respawn timer is requeued too.
+        ResetRendStadiumEvent(me);
     }
 
     void IsSummonedBy(WorldObject* /*summoner*/) override
@@ -418,6 +424,50 @@ private:
     ObjectGuid _victorGUID;
     ObjectGuid _waveDoorGUID;
 };
+
+void ResetRendStadiumEvent(Creature* source)
+{
+    InstanceScript* instance = source->GetInstanceScript();
+    if (!instance)
+        return;
+
+    Map* map = source->GetMap();
+
+    // Closed by EVENT_START_1; only Rend's full Reset or his death reopens it.
+    if (GameObject* entryDoor = map->GetGameObject(instance->GetGuidData(GO_GYTH_ENTRY_DOOR)))
+        entryDoor->SetGoState(GO_STATE_ACTIVE);
+
+    // The balcony Rend despawns when he summons Gyth. Under dynamic spawns that
+    // removes him from the map with his full respawn timer (a week), so the
+    // instance's Respawn(true) on FAIL finds nothing and the event can never be
+    // retried. Requeue his spawn for now; his Reset then restores the event.
+    std::vector<ObjectGuid::LowType> rendSpawns;
+    for (auto const& [spawnId, respawnTime] : map->GetCreatureRespawnTimes())
+        if (CreatureData const* data = sObjectMgr->GetCreatureData(spawnId))
+            if (data->id == NPC_WARCHIEF_REND_BLACKHAND)
+                rendSpawns.push_back(spawnId);
+
+    for (ObjectGuid::LowType spawnId : rendSpawns)
+    {
+        auto const bounds = map->GetCreatureBySpawnIdStore().equal_range(spawnId);
+        for (auto itr = bounds.first; itr != bounds.second; ++itr)
+            if (itr->second->isDead())
+                itr->second->Respawn(true);
+
+        time_t now = GameTime::GetGameTime().count();
+        map->SaveCreatureRespawnTime(spawnId, now);
+    }
+
+    // Rend evading marks Gyth FAIL, and Gyth's Reset only despawns him from
+    // IN_PROGRESS — left alone he would stand in the arena through the retry.
+    if (Creature* gyth = source->FindNearestCreature(NPC_GYTH, 200.0f, true))
+        if (gyth != source)
+            gyth->DespawnOrUnsummon();
+
+    // Nefarius walked off along his path; Rend's Reset only recalls him from 5y.
+    if (Creature* victor = source->FindNearestCreature(NPC_LORD_VICTOR_NEFARIUS, 200.0f, true))
+        victor->Respawn(true);
+}
 
 void AddSC_boss_rend_blackhand()
 {

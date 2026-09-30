@@ -148,6 +148,14 @@ enum npcspells
     SPELL_FINKLE_IS_EINHORN         = 16710
 };
 
+class Creature;
+
+// Puts the Rend/Gyth stadium back to its pre-event state after a wipe: reopens
+// the entrance portcullis, requeues the balcony Rend spawn, dismisses a
+// leftover Gyth and sends Nefarius home. Defined in boss_rend_blackhand.cpp;
+// safe to call more than once.
+void ResetRendStadiumEvent(Creature* source);
+
 template <class AI, class T>
 inline AI* GetBlackrockSpireAI(T* obj)
 {

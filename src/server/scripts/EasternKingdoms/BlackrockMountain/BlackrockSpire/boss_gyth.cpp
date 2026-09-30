@@ -62,6 +62,8 @@ struct boss_gyth : public BossAI
             instance->SetBossState(DATA_GYTH, NOT_STARTED);
             summons.DespawnAll();
             me->DespawnOrUnsummon();
+            // Gyth is no longer IN_PROGRESS, so the returning balcony Rend runs his full Reset.
+            ResetRendStadiumEvent(me);
         }
 
         SetInvincibility(true); // Don't let boss die before summoning Rend.
