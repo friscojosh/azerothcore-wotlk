@@ -771,15 +771,17 @@ void PathGenerator::CreateFilter()
     else // assume Player
     {
 #ifdef MOD_PLAYERBOTS
-        // Bots navigate with a stricter filter: include ground + water but exclude lava/slime and
-        // NAV_GROUND_STEEP (the 50-60deg slopes the extractor tags via modAlmostUnwalkableTriangles), so
-        // they keep off steep mountainsides and follow gentle ground/roads. Real players are unchanged and
-        // may still path across steep terrain.
+        // Bots navigate with a stricter filter: ground + water, never lava/slime. NAV_GROUND_STEEP (the
+        // 50-60deg slopes the extractor tags via modAlmostUnwalkableTriangles) is INCLUDED but costed
+        // below, so they keep off mountainsides and wall faces whenever there is a reasonable way round,
+        // yet are never stranded by them: on a regenerated mesh ~39% of all polys are steep (hill
+        // country), and excluding them outright left a bot standing on a slope with no start poly and
+        // cut whole outdoor zones off. Real players are unchanged.
         Player const* player = _source->ToPlayer();
         if (player && player->GetSession() && player->GetSession()->IsBot())
         {
-            includeFlags |= (NAV_GROUND | NAV_WATER);
-            excludeFlags |= (NAV_MAGMA | NAV_SLIME | NAV_GROUND_STEEP);
+            includeFlags |= (NAV_GROUND | NAV_GROUND_STEEP | NAV_WATER);
+            excludeFlags |= (NAV_MAGMA | NAV_SLIME);
             isBot = true;
         }
         else
@@ -794,10 +796,16 @@ void PathGenerator::CreateFilter()
     _filter.setExcludeFlags(excludeFlags);
 
 #ifdef MOD_PLAYERBOTS
-    // Bots bias their routes away from deep water (swim only when necessary). poly.area == poly.flags ==
-    // NavTerrain, so NAV_WATER doubles as the water area index. Real players and creatures assign no cost.
+    // Bots bias their routes away from deep water (swim only when necessary) and steep ground.
+    // poly.area == poly.flags == NavTerrain, so each flag doubles as its area index. Real players and
+    // creatures assign no cost.
     if (isBot)
+    {
         _filter.setAreaCost(NAV_WATER, 20.0f);
+        // Same indexing (area == NavTerrain): a steep route wins only when the level way round is more
+        // than 4x longer, or when it is the only way. Matches mod-dungeon-clear's SteepPathCost default.
+        _filter.setAreaCost(NAV_GROUND_STEEP, 4.0f);
+    }
 #endif
 
     UpdateFilter();
