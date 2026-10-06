@@ -200,6 +200,23 @@ struct boss_ragnaros : public BossAI
         ScheduleCombatEvents();
     }
 
+    // AzBots: how long until the next Wrath of Ragnaros, in milliseconds PLUS ONE, asked for by
+    // the spell's own id; 0 when none is scheduled (submerged, or not fighting). Wrath is
+    // instant, so a bot has nothing to react to except this schedule: the melee step outside its
+    // 25yd radius for it and the waiting tank picks him up when the tank on him is thrown back.
+    // The +1 keeps "due this instant" apart from "no answer" for a core without this hook.
+    uint32 GetData(uint32 type) const override
+    {
+        if (type != SPELL_WRATH_OF_RAGNAROS || !events.IsInPhase(PHASE_EMERGED))
+            return 0;
+
+        Milliseconds const until = events.GetTimeUntilEvent(EVENT_WRATH_OF_RAGNAROS);
+        if (until == Milliseconds::max())
+            return 0;
+
+        return uint32(std::max<int64>(until.count(), 0)) + 1;
+    }
+
     void JustDied(Unit* /*killer*/) override
     {
         _JustDied();
