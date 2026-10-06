@@ -55,6 +55,21 @@ struct boss_shazzrah : public BossAI
         events.ScheduleEvent(EVENT_SHAZZRAH_GATE, 30s);
     }
 
+    // AzBots: milliseconds until the next Counterspell PLUS ONE, asked for by the spell's own
+    // id; 0 when none is scheduled. It is instant and silences a school for 10s on anyone caught
+    // mid-cast within 45yd, so a caster's only defence is not to be casting when it lands.
+    uint32 GetData(uint32 type) const override
+    {
+        if (type != SPELL_COUNTERSPELL)
+            return 0;
+
+        Milliseconds const until = events.GetTimeUntilEvent(EVENT_COUNTERSPELL);
+        if (until == Milliseconds::max())
+            return 0;
+
+        return uint32(std::max<int64>(until.count(), 0)) + 1;
+    }
+
     void ExecuteEvent(uint32 eventId) override
     {
         switch (eventId)
