@@ -661,6 +661,24 @@ void PathGenerator::BuildPointPath(float const* startPoint, float const* endPoin
         dtVcopy(&pathPoints[1 * VERTEX_SIZE], endPoint);
         pointCount++;
     }
+    else if (pointCount >= _pointPathLimit && pointCount >= 2 && !(dtResult & DT_SLOPE_TOO_STEEP) && _source->IsPlayer())
+    {
+        // AzBots: a route too long for the point buffer is still a route. Upstream throws the
+        // points away here and returns a two-point "shortcut" from the start straight to the
+        // goal, which a player bot then walks through whatever stands between them (an enemy
+        // 60yd away over a wall but 1700yd away on foot). Keep the part that was built: the
+        // bot walks it, asks again from where it ends, and arrives the way a player would.
+        _pathPoints.resize(pointCount);
+        for (uint32 i = 0; i < pointCount; ++i)
+            _pathPoints[i] = G3D::Vector3(pathPoints[i * VERTEX_SIZE + 2], pathPoints[i * VERTEX_SIZE], pathPoints[i * VERTEX_SIZE + 1]);
+
+        NormalizePath();
+
+        SetActualEndPosition(_pathPoints[pointCount - 1]);
+
+        _type = PathType((_type & ~PATHFIND_NORMAL) | PATHFIND_INCOMPLETE | PATHFIND_SHORT);
+        return;
+    }
     else if (pointCount < 2 || dtStatusFailed(dtResult))
     {
         // If its too steep, just return incomplete path.

@@ -70,6 +70,36 @@ void PointMovementGenerator<T>::DoInitialize(T* unit)
         }
         else
         {
+            // AzBots: never walk a player bot through geometry. The straight line below is
+            // taken whenever the mesh route has two points or fewer -- which includes the
+            // case where the goal is only reachable by a route longer than the poly budget
+            // (or not at all): the bot ends up on the reachable polygon nearest the goal,
+            // the poly path collapses to that one polygon, BuildPointPath appends the raw
+            // goal, and the "path" is start -> goal straight through the wall between them.
+            // If the mesh stops short of the goal, go only as far as the mesh goes.
+            PathType const pathType = path.GetPathType();
+            if (unit->IsPlayer() && !_forceDestination && !(pathType & PATHFIND_NOT_USING_PATH) &&
+                (!result || (pathType & (PATHFIND_NOPATH | PATHFIND_INCOMPLETE))))
+            {
+                G3D::Vector3 const& reachable = path.GetActualEndPosition();
+                bool const stopsShort = result && !(pathType & PATHFIND_NOPATH) && path.GetPath().size() >= 2 &&
+                    (reachable - G3D::Vector3(i_x, i_y, i_z)).squaredLength() > 1.0f;
+                if (!stopsShort)
+                {
+                    // Nothing walkable leads there. Make "here" the goal so a later relaunch
+                    // (speed change, resume) cannot fall back to the straight line either.
+                    i_x = unit->GetPositionX();
+                    i_y = unit->GetPositionY();
+                    i_z = unit->GetPositionZ();
+                    unit->ClearUnitState(UNIT_STATE_ROAMING_MOVE);
+                    return;
+                }
+
+                i_x = reachable.x;
+                i_y = reachable.y;
+                i_z = reachable.z;
+            }
+
             // Xinef: fix strange client visual bug, moving on z coordinate only switches orientation by 180 degrees (visual only)
             if (G3D::fuzzyEq(unit->GetPositionX(), i_x) && G3D::fuzzyEq(unit->GetPositionY(), i_y))
             {
