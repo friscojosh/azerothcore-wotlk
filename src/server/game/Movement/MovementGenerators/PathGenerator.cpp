@@ -659,6 +659,19 @@ void PathGenerator::BuildPointPath(float const* startPoint, float const* endPoin
     {
         // First point is start position, append end position
         dtVcopy(&pathPoints[1 * VERTEX_SIZE], endPoint);
+
+        // AzBots: "very close" is not what this case always is. A search that stops short of
+        // the goal leaves the poly path ending on the reachable polygon nearest it; once the
+        // bot stands on that polygon the path is one polygon long and lands here, with the
+        // goal still a wall away. Appending the raw goal hands chase, follow and point
+        // movement a start -> goal segment through that wall, so end on the polygon instead.
+        if ((_type & PATHFIND_INCOMPLETE) && _source->IsPlayer())
+        {
+            float closestPoint[VERTEX_SIZE];
+            if (dtStatusSucceed(_navMeshQuery->closestPointOnPoly(_pathPolyRefs[0], endPoint, closestPoint, nullptr)))
+                dtVcopy(&pathPoints[1 * VERTEX_SIZE], closestPoint);
+        }
+
         pointCount++;
     }
     else if (pointCount >= _pointPathLimit && pointCount >= 2 && !(dtResult & DT_SLOPE_TOO_STEEP) && _source->IsPlayer())
