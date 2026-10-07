@@ -69,6 +69,16 @@ void SpellMgr::LoadSpellInfoCorrections()
         spellInfo->DurationEntry = sSpellDurationStore.LookupEntry(347); // 15 min
     });
 
+    // AzBots: Intense Heat reaches 15 yards on this realm, not Spell.dbc's 20.
+    // The blast a Flame of Ragnaros sets off on the ranged player Might of Ragnaros picked.
+    // At 20 the chamber floor cannot hold a raid's ranged in pairs out of each other's blast;
+    // at 15 it can. A realm rule, not a fix (Josh, 2026-10-06).
+    ApplySpellFix({ 21155 }, [](SpellInfo* spellInfo)
+    {
+        spellInfo->Effects[EFFECT_0].RadiusEntry = sSpellRadiusStore.LookupEntry(EFFECT_RADIUS_15_YARDS);
+        spellInfo->Effects[EFFECT_1].RadiusEntry = sSpellRadiusStore.LookupEntry(EFFECT_RADIUS_15_YARDS);
+    });
+
     // Elixir of Minor Fortitude
     ApplySpellFix({ 2378 }, [](SpellInfo* spellInfo)
     {
