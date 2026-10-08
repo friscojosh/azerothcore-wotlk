@@ -64,6 +64,35 @@ struct boss_baron_geddon : public BossAI
         events.ScheduleEvent(EVENT_LIVING_BOMB, 11s, 16s);
     }
 
+    // AzUI cast timers: milliseconds until the next Inferno, Ignite Mana or Living Bomb PLUS
+    // ONE, asked for by the spell's own id; 0 when none is scheduled (not fighting). Armageddon
+    // is not on a timer (2% health) and has no answer. mod-uibridge's CAST channel sends these
+    // to the addons.
+    uint32 GetData(uint32 type) const override
+    {
+        uint32 eventId = 0;
+        switch (type)
+        {
+            case SPELL_INFERNO:
+                eventId = EVENT_INFERNO;
+                break;
+            case SPELL_IGNITE_MANA:
+                eventId = EVENT_IGNITE_MANA;
+                break;
+            case SPELL_LIVING_BOMB:
+                eventId = EVENT_LIVING_BOMB;
+                break;
+            default:
+                return 0;
+        }
+
+        Milliseconds const until = events.GetTimeUntilEvent(eventId);
+        if (until == Milliseconds::max())
+            return 0;
+
+        return uint32(std::max<int64>(until.count(), 0)) + 1;
+    }
+
     void DamageTaken(Unit* /*attacker*/, uint32& damage, DamageEffectType /*dmgType*/, SpellSchoolMask /*school*/) override
     {
         // If boss is below 2% hp - cast Armageddon

@@ -58,12 +58,34 @@ struct boss_shazzrah : public BossAI
     // AzBots: milliseconds until the next Counterspell PLUS ONE, asked for by the spell's own
     // id; 0 when none is scheduled. It is instant and silences a school for 10s on anyone caught
     // mid-cast within 45yd, so a caster's only defence is not to be casting when it lands.
+    //
+    // AzUI cast timers: the same answer for Arcane Explosion, Shazzrah's Curse, Magic Grounding
+    // and the Gate blink (23138), which mod-uibridge's CAST channel sends to the addons.
     uint32 GetData(uint32 type) const override
     {
-        if (type != SPELL_COUNTERSPELL)
-            return 0;
+        uint32 eventId = 0;
+        switch (type)
+        {
+            case SPELL_COUNTERSPELL:
+                eventId = EVENT_COUNTERSPELL;
+                break;
+            case SPELL_ARCANE_EXPLOSION:
+                eventId = EVENT_ARCANE_EXPLOSION;
+                break;
+            case SPELL_SHAZZRAH_CURSE:
+                eventId = EVENT_SHAZZRAH_CURSE;
+                break;
+            case SPELL_MAGIC_GROUNDING:
+                eventId = EVENT_MAGIC_GROUNDING;
+                break;
+            case SPELL_SHAZZRAH_GATE_DUMMY:
+                eventId = EVENT_SHAZZRAH_GATE;
+                break;
+            default:
+                return 0;
+        }
 
-        Milliseconds const until = events.GetTimeUntilEvent(EVENT_COUNTERSPELL);
+        Milliseconds const until = events.GetTimeUntilEvent(eventId);
         if (until == Milliseconds::max())
             return 0;
 

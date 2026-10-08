@@ -73,6 +73,32 @@ struct boss_garr : public BossAI
         massEruptionTimer = 600000; // 10 mins
     }
 
+    // AzUI cast timers: milliseconds until the next Magma Shackles or Antimagic Pulse PLUS ONE,
+    // asked for by the spell's own id; 0 when none is scheduled (not fighting). Both are
+    // instant, so the debuff landing is the first a client sees of them -- too late to drink a
+    // Free Action Potion for the Shackles. mod-uibridge's CAST channel sends these to the addons.
+    uint32 GetData(uint32 type) const override
+    {
+        uint32 eventId = 0;
+        switch (type)
+        {
+            case SPELL_MAGMA_SHACKLES:
+                eventId = EVENT_MAGMA_SHACKLES;
+                break;
+            case SPELL_ANTIMAGIC_PULSE:
+                eventId = EVENT_ANTIMAGIC_PULSE;
+                break;
+            default:
+                return 0;
+        }
+
+        Milliseconds const until = events.GetTimeUntilEvent(eventId);
+        if (until == Milliseconds::max())
+            return 0;
+
+        return uint32(std::max<int64>(until.count(), 0)) + 1;
+    }
+
     void UpdateAI(uint32 diff) override
     {
         if (!UpdateVictim())

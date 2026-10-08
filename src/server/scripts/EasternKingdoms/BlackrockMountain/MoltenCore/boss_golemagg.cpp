@@ -70,6 +70,24 @@ struct boss_golemagg : public BossAI
         }
     }
 
+    // AzUI cast timers: milliseconds until the next Pyroblast or Earthquake PLUS ONE, asked for
+    // by the spell's own id; 0 when none is due (not fighting; Earthquake only runs once he is
+    // below 10%). These are this script's own countdowns rather than an EventMap. The Pyroblast
+    // one stands still while he is casting. mod-uibridge's CAST channel sends these to the addons.
+    uint32 GetData(uint32 type) const override
+    {
+        if (!me->IsInCombat())
+            return 0;
+
+        if (type == SPELL_PYROBLAST)
+            return pyroblastTimer + 1;
+
+        if (type == SPELL_EARTHQUAKE && earthquakeTimer)
+            return earthquakeTimer + 1;
+
+        return 0;
+    }
+
     void UpdateAI(uint32 diff) override
     {
         if (!UpdateVictim())

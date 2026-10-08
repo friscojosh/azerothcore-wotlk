@@ -240,6 +240,40 @@ struct boss_majordomo : public BossAI
         aliveMinionsGUIDS = static_minionsGUIDS;
     }
 
+    // AzUI cast timers: milliseconds until the next shield or teleport PLUS ONE, asked for by
+    // the spell's own id; 0 when none is scheduled (not fighting, or the fight is won). One
+    // event casts either Magic Reflection or Damage Shield, chosen when it fires, so both ids
+    // answer with the same time. The phase test matters: the outro and the Ragnaros summoning
+    // reuse these event ids. mod-uibridge's CAST channel sends these to the addons.
+    uint32 GetData(uint32 type) const override
+    {
+        if (!events.IsInPhase(PHASE_COMBAT))
+            return 0;
+
+        uint32 eventId = 0;
+        switch (type)
+        {
+            case SPELL_MAGIC_REFLECTION:
+            case SPELL_DAMAGE_REFLECTION:
+                eventId = EVENT_SHIELD_REFLECTION;
+                break;
+            case SPELL_TELEPORT_RANDOM:
+                eventId = EVENT_TELEPORT_RANDOM;
+                break;
+            case SPELL_TELEPORT_TARGET:
+                eventId = EVENT_TELEPORT_TARGET;
+                break;
+            default:
+                return 0;
+        }
+
+        Milliseconds const until = events.GetTimeUntilEvent(eventId);
+        if (until == Milliseconds::max())
+            return 0;
+
+        return uint32(std::max<int64>(until.count(), 0)) + 1;
+    }
+
     void SummonedCreatureDies(Creature* summon, Unit* /*killer*/) override
     {
         aliveMinionsGUIDS.erase(summon->GetGUID());

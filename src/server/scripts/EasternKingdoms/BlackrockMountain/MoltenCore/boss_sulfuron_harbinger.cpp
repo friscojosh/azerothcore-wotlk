@@ -60,6 +60,37 @@ struct boss_sulfuron : public BossAI
         events.ScheduleEvent(EVENT_FLAMESPEAR, 2s);
     }
 
+    // AzUI cast timers: milliseconds until the next Demoralizing Shout, Inspire, Knockdown or
+    // Flame Spear PLUS ONE, asked for by the spell's own id; 0 when none is scheduled (not
+    // fighting). mod-uibridge's CAST channel sends these to the addons.
+    uint32 GetData(uint32 type) const override
+    {
+        uint32 eventId = 0;
+        switch (type)
+        {
+            case SPELL_DEMORALIZING_SHOUT:
+                eventId = EVENT_DEMORALIZING_SHOUT;
+                break;
+            case SPELL_INSPIRE:
+                eventId = EVENT_INSPIRE;
+                break;
+            case SPELL_KNOCKDOWN:
+                eventId = EVENT_KNOCKDOWN;
+                break;
+            case SPELL_FLAMESPEAR:
+                eventId = EVENT_FLAMESPEAR;
+                break;
+            default:
+                return 0;
+        }
+
+        Milliseconds const until = events.GetTimeUntilEvent(eventId);
+        if (until == Milliseconds::max())
+            return 0;
+
+        return uint32(std::max<int64>(until.count(), 0)) + 1;
+    }
+
     void ExecuteEvent(uint32 eventId) override
     {
         switch (eventId)
@@ -116,6 +147,27 @@ struct npc_flamewaker_priest : public ScriptedAI
         events.ScheduleEvent(EVENT_DARK_MENDING, 15s, 30s);
         events.ScheduleEvent(EVENT_SHADOW_WORD_PAIN, 2s, 4s);
         events.ScheduleEvent(EVENT_IMMOLATE, 3500ms, 6s);
+    }
+
+    // AzUI: milliseconds until this priest's next Dark Mending (the heal to interrupt) PLUS ONE,
+    // asked for by the spell's own id; 0 when none is scheduled (not fighting, or dead).
+    uint32 GetData(uint32 type) const override
+    {
+        uint32 eventId = 0;
+        switch (type)
+        {
+            case SPELL_DARK_MENDING:
+                eventId = EVENT_DARK_MENDING;
+                break;
+            default:
+                return 0;
+        }
+
+        Milliseconds const until = events.GetTimeUntilEvent(eventId);
+        if (until == Milliseconds::max())
+            return 0;
+
+        return uint32(std::max<int64>(until.count(), 0)) + 1;
     }
 
     void UpdateAI(uint32 diff) override

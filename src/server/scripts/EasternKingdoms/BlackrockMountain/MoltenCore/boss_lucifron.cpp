@@ -45,6 +45,31 @@ struct boss_lucifron : public BossAI
         events.ScheduleEvent(EVENT_SHADOW_SHOCK, 5s);
     }
 
+    // AzUI cast timers: milliseconds until the next Impending Doom or Lucifron's Curse PLUS ONE,
+    // asked for by the spell's own id; 0 when none is scheduled (not fighting). mod-uibridge's
+    // CAST channel sends these to the addons, so a warning can come before the cast lands.
+    uint32 GetData(uint32 type) const override
+    {
+        uint32 eventId = 0;
+        switch (type)
+        {
+            case SPELL_IMPENDING_DOOM:
+                eventId = EVENT_IMPENDING_DOOM;
+                break;
+            case SPELL_LUCIFRON_CURSE:
+                eventId = EVENT_LUCIFRON_CURSE;
+                break;
+            default:
+                return 0;
+        }
+
+        Milliseconds const until = events.GetTimeUntilEvent(eventId);
+        if (until == Milliseconds::max())
+            return 0;
+
+        return uint32(std::max<int64>(until.count(), 0)) + 1;
+    }
+
     void ExecuteEvent(uint32 eventId) override
     {
         switch (eventId)

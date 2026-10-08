@@ -60,6 +60,37 @@ struct boss_magmadar : public BossAI
         events.ScheduleEvent(EVENT_LAVA_BOMB_RANGED, 15s);
     }
 
+    // AzUI cast timers: milliseconds until the next Panic, Frenzy or Lava Bomb (the melee one
+    // and the ranged one, each by its own id) PLUS ONE, asked for by the spell's own id; 0 when
+    // none is scheduled (not fighting). mod-uibridge's CAST channel sends these to the addons.
+    uint32 GetData(uint32 type) const override
+    {
+        uint32 eventId = 0;
+        switch (type)
+        {
+            case SPELL_FRENZY:
+                eventId = EVENT_FRENZY;
+                break;
+            case SPELL_PANIC:
+                eventId = EVENT_PANIC;
+                break;
+            case SPELL_LAVA_BOMB:
+                eventId = EVENT_LAVA_BOMB;
+                break;
+            case SPELL_LAVA_BOMB_RANGED:
+                eventId = EVENT_LAVA_BOMB_RANGED;
+                break;
+            default:
+                return 0;
+        }
+
+        Milliseconds const until = events.GetTimeUntilEvent(eventId);
+        if (until == Milliseconds::max())
+            return 0;
+
+        return uint32(std::max<int64>(until.count(), 0)) + 1;
+    }
+
     void ExecuteEvent(uint32 eventId) override
     {
         switch (eventId)

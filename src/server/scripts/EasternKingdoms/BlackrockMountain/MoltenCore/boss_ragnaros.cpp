@@ -205,12 +205,43 @@ struct boss_ragnaros : public BossAI
     // instant, so a bot has nothing to react to except this schedule: the melee step outside its
     // 25yd radius for it and the waiting tank picks him up when the tank on him is thrown back.
     // The +1 keeps "due this instant" apart from "no answer" for a core without this hook.
+    //
+    // AzUI cast timers: the same answer for Hand of Ragnaros, Might of Ragnaros, Lava Burst and
+    // the submerge (asked for as 20567, its visual), and while he is submerged for the emerge
+    // (20568) -- the latest he comes back; he is back sooner once the last Son of Flame dies.
+    // mod-uibridge's CAST channel sends these to the addons.
     uint32 GetData(uint32 type) const override
     {
-        if (type != SPELL_WRATH_OF_RAGNAROS || !events.IsInPhase(PHASE_EMERGED))
-            return 0;
+        Milliseconds until = Milliseconds::max();
+        if (type == SPELL_RAGEMERGE)
+        {
+            if (events.IsInPhase(PHASE_SUBMERGED))
+                until = extraEvents.GetTimeUntilEvent(EVENT_EMERGE);
+        }
+        else if (events.IsInPhase(PHASE_EMERGED))
+        {
+            switch (type)
+            {
+                case SPELL_WRATH_OF_RAGNAROS:
+                    until = events.GetTimeUntilEvent(EVENT_WRATH_OF_RAGNAROS);
+                    break;
+                case SPELL_HAND_OF_RAGNAROS:
+                    until = events.GetTimeUntilEvent(EVENT_HAND_OF_RAGNAROS);
+                    break;
+                case SPELL_MIGHT_OF_RAGNAROS:
+                    until = events.GetTimeUntilEvent(EVENT_MIGHT_OF_RAGNAROS);
+                    break;
+                case SPELL_LAVA_BURST:
+                    until = events.GetTimeUntilEvent(EVENT_LAVA_BURST);
+                    break;
+                case SPELL_RAGNA_SUBMERGE_VISUAL:
+                    until = events.GetTimeUntilEvent(EVENT_SUBMERGE);
+                    break;
+                default:
+                    break;
+            }
+        }
 
-        Milliseconds const until = events.GetTimeUntilEvent(EVENT_WRATH_OF_RAGNAROS);
         if (until == Milliseconds::max())
             return 0;
 

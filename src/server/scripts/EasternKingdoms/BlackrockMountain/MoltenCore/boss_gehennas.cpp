@@ -46,6 +46,36 @@ struct boss_gehennas : public BossAI
         events.ScheduleEvent(EVENT_SHADOW_BOLT, 3s, 5s);
     }
 
+    // AzUI cast timers: milliseconds until the next Gehennas' Curse, Rain of Fire or Shadow Bolt
+    // PLUS ONE, asked for by the spell's own id; 0 when none is scheduled (not fighting). One
+    // event casts either Shadow Bolt, chosen when it fires, so both ids answer with the same
+    // time. mod-uibridge's CAST channel sends these to the addons.
+    uint32 GetData(uint32 type) const override
+    {
+        uint32 eventId = 0;
+        switch (type)
+        {
+            case SPELL_GEHENNAS_CURSE:
+                eventId = EVENT_GEHENNAS_CURSE;
+                break;
+            case SPELL_RAIN_OF_FIRE:
+                eventId = EVENT_RAIN_OF_FIRE;
+                break;
+            case SPELL_SHADOW_BOLT_RANDOM:
+            case SPELL_SHADOW_BOLT_VICTIM:
+                eventId = EVENT_SHADOW_BOLT;
+                break;
+            default:
+                return 0;
+        }
+
+        Milliseconds const until = events.GetTimeUntilEvent(eventId);
+        if (until == Milliseconds::max())
+            return 0;
+
+        return uint32(std::max<int64>(until.count(), 0)) + 1;
+    }
+
     void ExecuteEvent(uint32 eventId) override
     {
         switch (eventId)
