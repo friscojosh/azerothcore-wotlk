@@ -402,6 +402,7 @@ bool InstanceScript::SetBossState(uint32 id, EncounterState state)
     if (id < bosses.size())
     {
         BossInfo* bossInfo = &bosses[id];
+        EncounterState const previousState = bossInfo->state;
         MinionSet minions = bossInfo->minion;
 
         sScriptMgr->OnBeforeSetBossState(id, state, bossInfo->state, instance);
@@ -432,6 +433,7 @@ bool InstanceScript::SetBossState(uint32 id, EncounterState state)
             if (minion)
                 UpdateMinionState(minion, state);
 
+        sScriptMgr->OnAfterSetBossState(id, state, previousState, instance);
         return true;
     }
     return false;

@@ -2671,6 +2671,16 @@ Item* Player::StoreNewItem(ItemPosCountVec const& dest, uint32 item, bool update
         count += itr->count;
 
     Item* pItem = Item::CreateItem(item, count, this, false, randomPropertyId);
+    return StorePreparedNewItem(dest, pItem, update, allowedLooters, refund);
+}
+
+Item* Player::StorePreparedNewItem(ItemPosCountVec const& dest, Item* pItem, bool update,
+                                   AllowedLooterSet& allowedLooters, bool refund)
+{
+    uint32 count = 0;
+    for (ItemPosCount const& position : dest)
+        count += position.count;
+    uint32 item = pItem ? pItem->GetEntry() : 0;
     if (pItem)
     {
         // pussywizard: obtaining blue or better items saves to db
@@ -2844,6 +2854,14 @@ Item* Player::EquipNewItem(uint16 pos, uint32 item, bool update)
     Item* _item = Item::CreateItem(item, 1, this);
     if (!_item)
         return nullptr;
+
+    return EquipPreparedNewItem(pos, _item, update);
+}
+
+Item* Player::EquipPreparedNewItem(uint16 pos, Item* _item, bool update)
+{
+    ASSERT(_item);
+    uint32 item = _item->GetEntry();
 
     if (!IsEquipmentPos(pos) || sScriptMgr->OnPlayerCanSaveEquipNewItem(this, _item, pos, update))
     {
@@ -6909,8 +6927,10 @@ void Player::PrettyPrintRequirementsItemsList(std::vector<ProgressionRequirement
     }
 }
 
-bool Player::Satisfy(DungeonProgressionRequirements const* ar, uint32 target_map, bool report)
+bool Player::Satisfy(DungeonProgressionRequirements const* ar, uint32 target_map, bool report,
+                     Optional<Difficulty> difficultyOverride, bool silent)
 {
+    report = report && !silent;
     if (!IsGameMaster() && ar)
     {
         uint8 LevelMin = 0;
@@ -6919,6 +6939,7 @@ bool Player::Satisfy(DungeonProgressionRequirements const* ar, uint32 target_map
         MapEntry const* mapEntry = sMapStore.LookupEntry(target_map);
         if (!mapEntry)
             return false;
+        Difficulty targetDifficulty = difficultyOverride.value_or(GetDifficulty(mapEntry->IsRaid()));
 
         if (!sWorld->getBoolConfig(CONFIG_INSTANCE_IGNORE_LEVEL))
         {
@@ -6928,9 +6949,11 @@ bool Player::Satisfy(DungeonProgressionRequirements const* ar, uint32 target_map
                 LevelMax = ar->levelMax;
         }
 
-        if (sDisableMgr->IsDisabledFor(DISABLE_TYPE_MAP, target_map, this))
+        if (sDisableMgr->IsDisabledFor(DISABLE_TYPE_MAP, target_map, difficultyOverride ? nullptr : this,
+                                       uint8(targetDifficulty)))
         {
-            GetSession()->SendAreaTriggerMessage(LANG_INSTANCE_CLOSED);
+            if (!silent)
+                GetSession()->SendAreaTriggerMessage(LANG_INSTANCE_CLOSED);
             return false;
         }
 
@@ -7026,7 +7049,7 @@ bool Player::Satisfy(DungeonProgressionRequirements const* ar, uint32 target_map
             }
         }
 
-        Difficulty target_difficulty = GetDifficulty(mapEntry->IsRaid());
+        Difficulty target_difficulty = targetDifficulty;
         MapDifficulty const* mapDiff = GetDownscaledMapDifficultyData(target_map, target_difficulty);
         if (LevelMin || LevelMax || ilvlRequirementNotMet
             || missingPlayerItems.size() || missingPlayerQuests.size() || missingPlayerAchievements.size()

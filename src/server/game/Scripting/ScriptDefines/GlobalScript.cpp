@@ -161,3 +161,8 @@ GlobalScript::GlobalScript(char const* name, std::vector<uint16> enabledHooks)
 }
 
 template class AC_GAME_API ScriptRegistry<GlobalScript>;
+
+void ScriptMgr::OnAfterSetBossState(uint32 id, EncounterState newState, EncounterState oldState, Map* instance)
+{
+    CALL_ENABLED_HOOKS(GlobalScript, GLOBALHOOK_ON_AFTER_SET_BOSS_STATE, script->OnAfterSetBossState(id, newState, oldState, instance));
+}

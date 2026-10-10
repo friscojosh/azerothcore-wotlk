@@ -23,6 +23,17 @@ void CharacterDatabaseConnection::DoPrepareStatements()
     if (!m_reconnecting)
         m_stmts.resize(MAX_CHARACTERDATABASE_STATEMENTS);
 
+    PrepareStatement(CHAR_SEL_ENCOUNTER_CREDIT_COUNT, "SELECT COUNT(*) FROM character_encounter_credit",
+                     CONNECTION_SYNCH);
+    PrepareStatement(CHAR_SEL_ENCOUNTER_CREDITS, "SELECT guid, scope, encounter FROM character_encounter_credit",
+                     CONNECTION_SYNCH);
+    PrepareStatement(CHAR_INS_ENCOUNTER_CREDIT,
+                     "INSERT IGNORE INTO character_encounter_credit (guid, scope, encounter) VALUES (?, ?, ?)",
+                     CONNECTION_SYNCH);
+    PrepareStatement(CHAR_SEL_ENCOUNTER_CREDIT,
+                     "SELECT 1 FROM character_encounter_credit WHERE guid=? AND scope=? AND encounter=?",
+                     CONNECTION_SYNCH);
+
     PrepareStatement(CHAR_DEL_QUEST_POOL_SAVE, "DELETE FROM pool_quest_save WHERE pool_id = ?", CONNECTION_ASYNC);
     PrepareStatement(CHAR_INS_QUEST_POOL_SAVE, "INSERT INTO pool_quest_save (pool_id, quest_id) VALUES (?, ?)", CONNECTION_ASYNC);
     PrepareStatement(CHAR_DEL_NONEXISTENT_GUILD_BANK_ITEM, "DELETE FROM guild_bank_item WHERE guildid = ? AND TabId = ? AND SlotId = ?", CONNECTION_ASYNC);

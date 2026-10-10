@@ -1331,8 +1331,13 @@ public:
     InventoryResult CanRollForItemInLFG(ItemTemplate const* item, WorldObject const* lootedObject) const;
     Item* StoreNewItem(ItemPosCountVec const& pos, uint32 item, bool update, int32 randomPropertyId = 0, bool refund = false);
     Item* StoreNewItem(ItemPosCountVec const& pos, uint32 item, bool update, int32 randomPropertyId, AllowedLooterSet& allowedLooters, bool refund = false);
+    // Takes ownership after storage checks; retains normal new-item hooks and quest updates.
+    Item* StorePreparedNewItem(ItemPosCountVec const& dest, Item* item, bool update, AllowedLooterSet& allowedLooters,
+                               bool refund = false);
     Item* StoreItem(ItemPosCountVec const& pos, Item* pItem, bool update);
     Item* EquipNewItem(uint16 pos, uint32 item, bool update);
+    // Takes ownership of an already created new item after the caller's equip checks.
+    Item* EquipPreparedNewItem(uint16 pos, Item* item, bool update);
     Item* EquipItem(uint16 pos, Item* pItem, bool update);
     void AutoUnequipOffhandIfNeed(bool force = false);
     bool StoreNewItemInBestSlots(uint32 item_id, uint32 item_count);
@@ -2496,7 +2501,8 @@ public:
     void PrettyPrintRequirementsQuestList(std::vector<ProgressionRequirement const*> const& missingQuests) const;
     void PrettyPrintRequirementsAchievementsList(std::vector<ProgressionRequirement const*> const& missingAchievements) const;
     void PrettyPrintRequirementsItemsList(std::vector<ProgressionRequirement const*> const& missingItems) const;
-    bool Satisfy(DungeonProgressionRequirements const* ar, uint32 target_map, bool report = false);
+    bool Satisfy(DungeonProgressionRequirements const* ar, uint32 target_map, bool report = false,
+                 Optional<Difficulty> difficultyOverride = {}, bool silent = false);
     bool CheckInstanceLoginValid();
     [[nodiscard]] bool CheckInstanceCount(uint32 instanceId) const;
 

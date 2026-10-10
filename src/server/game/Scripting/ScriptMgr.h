@@ -564,6 +564,7 @@ public: /* GlobalScript */
     bool OnAllowedToLootContainerCheck(Player const* player, ObjectGuid source);
     void OnInstanceIdRemoved(uint32 instanceId);
     void OnBeforeSetBossState(uint32 id, EncounterState newState, EncounterState oldState, Map* instance);
+    void OnAfterSetBossState(uint32 id, EncounterState newState, EncounterState oldState, Map* instance);
     void AfterInstanceGameObjectCreate(Map* instance, GameObject* go);
 
 public: /* Scheduled scripts */
