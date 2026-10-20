@@ -576,6 +576,18 @@ bool IsNodeIncludedInShortenedPath(TaxiPathNodeEntry const* p1, TaxiPathNodeEntr
     return p1->mapid != p2->mapid || std::pow(p1->x - p2->x, 2) + std::pow(p1->y - p2->y, 2) > SKIP_SPLINE_POINT_DISTANCE_SQ;
 }
 
+// AzFlight: taxi nodes where a flight that carries on keeps the points the previous leg ended on.
+// Shortening drops every point within 40 yards of the node from both legs, then also takes back points of
+// the previous leg that lie within 40 yards of the next leg's first remaining point, and joins what is
+// left. The Ironforge roost (6) is at the end of a dead-end hall with both ways in on one side: taking
+// points back there folded the turn into a hairpin on one point (and, before its routes were moved, cut
+// it through the Great Forge's lava). Without it, the turn is flown round the loop that the arriving
+// route's last points and the leaving route's first points make in the open middle of the hall.
+static bool KeepsPreviousLegThrough(uint32 taxiNode)
+{
+    return taxiNode == 6;
+}
+
 bool FlightPathMovementGenerator::LoadPath(Player* player)
 {
     i_path.clear();
@@ -602,11 +614,12 @@ bool FlightPathMovementGenerator::LoadPath(Player* player)
 
         TaxiPathNodeEntry const* start = nodes[0];
         TaxiPathNodeEntry const* end = nodes[nodes.size() - 1];
+        bool keepPreviousLeg = src && KeepsPreviousLegThrough(taxi[src]);
         bool passedPreviousSegmentProximityCheck = false;
         bool addedPathNode = false;
         for (uint32 i = 0; i < nodes.size(); ++i)
         {
-            if (passedPreviousSegmentProximityCheck || !src || i_path.empty() || IsNodeIncludedInShortenedPath(i_path[i_path.size() - 1], nodes[i]))
+            if (passedPreviousSegmentProximityCheck || !src || keepPreviousLeg || i_path.empty() || IsNodeIncludedInShortenedPath(i_path[i_path.size() - 1], nodes[i]))
             {
                 if ((!src || (IsNodeIncludedInShortenedPath(start, nodes[i]) && i >= 2)) &&
                     (dst == taxi.size() - 1 || (IsNodeIncludedInShortenedPath(end, nodes[i]) && i < nodes.size() - 1)))
