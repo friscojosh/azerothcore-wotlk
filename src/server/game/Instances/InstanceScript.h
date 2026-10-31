@@ -266,6 +266,13 @@ public:
 
     bool _SkipCheckRequiredBosses(Player const* player = nullptr) const;
 
+    // AzPractice required-bosses bypass (0020): a transient, in-memory switch that makes _SkipCheckRequiredBosses
+    // answer true for this instance, so practice can fight a boss whose prerequisite is not done WITHOUT writing that
+    // prerequisite into the saved instance (SetBossState persists through SaveToDB). Never saved; unset by default,
+    // when nothing changes.
+    void SetPracticeSkipRequiredBosses(bool on) { _practiceSkipRequiredBosses = on; }
+    [[nodiscard]] bool PracticeSkipRequiredBosses() const { return _practiceSkipRequiredBosses; }
+
     void SetCompletedEncountersMask(uint32 newMask, bool save);
 
     // Returns completed encounters mask for packets
@@ -356,6 +363,7 @@ private:
     ObjectGuidMap _objectGuids;
     ObjectStateMap _objectStateMap;
     uint32 completedEncounters; // completed encounter mask, bit indexes are DungeonEncounter.dbc boss numbers, used for packets
+    bool _practiceSkipRequiredBosses = false;  // AzPractice (0020): transient, never saved
     TeamId _teamIdInInstance;
     std::unordered_set<uint32> _activatedAreaTriggers;
 };

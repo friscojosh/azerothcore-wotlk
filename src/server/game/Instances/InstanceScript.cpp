@@ -394,6 +394,9 @@ void InstanceScript::SetSummoner(Creature* creature)
 
 bool InstanceScript::_SkipCheckRequiredBosses(Player const* player /*= nullptr*/) const
 {
+    // AzPractice required-bosses bypass (0020): transient, in memory only.
+    if (_practiceSkipRequiredBosses)
+        return true;
     return player && player->GetSession()->HasPermission(rbac::RBAC_PERM_SKIP_CHECK_INSTANCE_REQUIRED_BOSSES);
 }
 
