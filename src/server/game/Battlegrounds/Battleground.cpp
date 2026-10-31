@@ -1261,7 +1261,15 @@ void Battleground::AddOrSetPlayerToCorrectBgGroup(Player* player, TeamId teamId)
     {
         group = new Group;
         SetBgRaid(teamId, group);
-        group->Create(player);
+        if (!group->Create(player))
+        {
+            // Never publish an uncreated group (it would be stored under GUID 0 and joined by the next players).
+            LOG_ERROR("bg.battleground", "Battleground::AddOrSetPlayerToCorrectBgGroup: could not create the {} raid for {}",
+                      teamId == TEAM_ALLIANCE ? "Alliance" : "Horde", player->GetName());
+            SetBgRaid(teamId, nullptr);
+            delete group;
+            return;
+        }
         sGroupMgr->AddGroup(group);
     }
     else if (group->IsMember(playerGuid))
@@ -1271,7 +1279,11 @@ void Battleground::AddOrSetPlayerToCorrectBgGroup(Player* player, TeamId teamId)
     }
     else
     {
-        group->AddMember(player);
+        if (!group->AddMember(player))
+        {
+            LOG_ERROR("bg.battleground", "Battleground::AddOrSetPlayerToCorrectBgGroup: could not add {} to the team raid", player->GetName());
+            return;
+        }
 
         if (Group* originalGroup = player->GetOriginalGroup())
             if (originalGroup->IsLeader(playerGuid))

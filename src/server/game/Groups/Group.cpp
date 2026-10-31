@@ -144,7 +144,9 @@ Group::~Group()
 bool Group::Create(Player* leader)
 {
     ObjectGuid leaderGuid = leader->GetGUID();
-    if (!sPracticeInstances->MayCreateGroup(leaderGuid))  // AzPractice (0021): a practice member forms no other group
+    // AzPractice (0021): a practice member forms no other group (battleground/battlefield raids keep their own rules:
+    // practice members are refused at the queue, the port and the map instead)
+    if (!isBGGroup() && !isBFGroup() && !sPracticeInstances->MayCreateGroup(leaderGuid))
         return false;
     ObjectGuid::LowType lowguid = sGroupMgr->GenerateGroupId();
 
@@ -433,7 +435,7 @@ bool Group::AddMember(Player* player, uint8 roles /* = 0 */)
         return false;
 
     // AzPractice (0021): a practice session's group takes only its members; a member joins no other group
-    if (!sPracticeInstances->MayJoinGroup(player->GetGUID(), GetGUID()))
+    if (!isBGGroup() && !isBFGroup() && !sPracticeInstances->MayJoinGroup(player->GetGUID(), GetGUID()))
         return false;
 
     // Get first not-full group
@@ -506,9 +508,12 @@ bool Group::AddMember(Player* player, uint8 roles /* = 0 */)
     {
         sScriptMgr->OnGroupAddMember(this, player->GetGUID());
 
+        // AzPractice (0021): a practice session's group transitions never reset its members' real binds
+        bool const practiceGroup = sPracticeInstances->IsSessionGroup(GetGUID());
         if (!IsLeader(player->GetGUID()) && !isBGGroup() && !isBFGroup())
         {
-            Player::ResetInstances(player->GetGUID(), INSTANCE_RESET_GROUP_JOIN, false);
+            if (!practiceGroup)
+                Player::ResetInstances(player->GetGUID(), INSTANCE_RESET_GROUP_JOIN, false);
 
             if (player->GetDungeonDifficulty() != GetDungeonDifficulty())
             {
@@ -521,7 +526,7 @@ bool Group::AddMember(Player* player, uint8 roles /* = 0 */)
                 player->SendRaidDifficulty(true);
             }
         }
-        else if (IsLeader(player->GetGUID()) && isLFGGroup()) // pussywizard
+        else if (IsLeader(player->GetGUID()) && isLFGGroup() && !practiceGroup) // pussywizard
         {
             Player::ResetInstances(player->GetGUID(), INSTANCE_RESET_GROUP_JOIN, false);
         }
@@ -598,6 +603,10 @@ void Group::AddMemberWithGuid(ObjectGuid guid)
         AddMember(player);
         return;
     }
+
+    // AzPractice (0021): the offline (cluster) add obeys the same boundary
+    if (!isBGGroup() && !isBFGroup() && !sPracticeInstances->MayJoinGroup(guid, GetGUID()))
+        return;
 
     // Get first not-full group
     uint8 subGroup = 0;
@@ -742,7 +751,7 @@ bool Group::RemoveMember(ObjectGuid guid, RemoveMethod const& method /*= GROUP_R
         }
 
         _homebindIfInstance(player);
-        if (!isBGGroup() && !isBFGroup())
+        if (!isBGGroup() && !isBFGroup() && !sPracticeInstances->IsSessionGroup(GetGUID()))  // AzPractice (0021)
             Player::ResetInstances(guid, INSTANCE_RESET_GROUP_LEAVE, false);
 
         sScriptMgr->OnGroupRemoveMember(this, guid, method, kicker, reason);
@@ -854,7 +863,7 @@ void Group::ForcedDisband(bool hideDestroy /* = false */)
         }
 
         _homebindIfInstance(player);
-        if (!isBGGroup() && !isBFGroup())
+        if (!isBGGroup() && !isBFGroup() && !sPracticeInstances->IsSessionGroup(GetGUID()))  // AzPractice (0021)
             Player::ResetInstances(citr->guid, INSTANCE_RESET_GROUP_LEAVE, false);
 
         if (!player)

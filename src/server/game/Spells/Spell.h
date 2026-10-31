@@ -566,6 +566,11 @@ public:
     int32 GetCastTimeRemaining() { return m_timer;}
     bool IsNextMeleeSwingSpell() const;
     bool IsTriggered() const { return HasTriggeredCastFlag(TRIGGERED_FULL_MASK); };
+
+    // AzPractice (0021): a process-unique identity of this spell execution, and the one whose effects run on this
+    // thread right now (0: none), so an observer of a damage or hit callback can tell which cast it belongs to.
+    [[nodiscard]] uint64 GetOccurrenceId() const { return m_occurrenceId; }
+    [[nodiscard]] static uint64 ExecutingOccurrence();
     bool HasTriggeredCastFlag(TriggerCastFlags flag) const { return _triggeredCastFlags & flag; };
     [[nodiscard]] bool IsProcDisabled() const { return HasTriggeredCastFlag(TRIGGERED_DISALLOW_PROC_EVENTS); }
     bool IsChannelActive() const { return m_caster->GetUInt32Value(UNIT_CHANNEL_SPELL) != 0; }
@@ -667,6 +672,7 @@ public:
     // These vars are used in both delayed spell system and modified immediate spell system
     bool m_referencedFromCurrentSpell;                  // mark as references to prevent deleted and access by dead pointers
     bool m_executedCurrently;                           // mark as executed to prevent deleted and access by dead pointers
+    uint64 m_occurrenceId = 0;                          // AzPractice (0021): GetOccurrenceId
     bool m_needComboPoints;
     uint8 m_applyMultiplierMask;
     float m_damageMultipliers[3];

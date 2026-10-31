@@ -16,6 +16,7 @@
  */
 
 #include "Player.h"
+#include "PracticeInstances.h"
 #include "AccountMgr.h"
 #include "AchievementMgr.h"
 #include "AreaDefines.h"
@@ -15253,6 +15254,20 @@ void Player::_SaveCharacter(bool create, CharacterDatabaseTransaction trans)
                     if (m->IsNonRaidDungeon()) dd = m->GetDifficulty();
                     else rd = m->GetDifficulty();
                 }
+            if (sPracticeInstances->IsOwned(GetInstanceId()))
+            {
+                // AzPractice (0021): the owned instance is never written; a restart or a later login finds the
+                // member at its homebind, not in a dungeon that no longer exists.
+                stmt->SetData(index++, (uint16)m_homebindMapId);
+                stmt->SetData(index++, (uint32)0);
+                stmt->SetData(index++, (uint8(GetDungeonDifficulty()) | uint8(GetRaidDifficulty()) << 4));
+                stmt->SetData(index++, finiteAlways(m_homebindX));
+                stmt->SetData(index++, finiteAlways(m_homebindY));
+                stmt->SetData(index++, finiteAlways(m_homebindZ));
+                stmt->SetData(index++, finiteAlways(GetOrientation()));
+            }
+            else
+            {
             stmt->SetData(index++, (uint16)GetMapId());
             stmt->SetData(index++, (uint32)GetInstanceId());
             stmt->SetData(index++, (uint8(dd) | uint8(rd) << 4));
@@ -15260,6 +15275,7 @@ void Player::_SaveCharacter(bool create, CharacterDatabaseTransaction trans)
             stmt->SetData(index++, finiteAlways(GetPositionY()));
             stmt->SetData(index++, finiteAlways(GetPositionZ()));
             stmt->SetData(index++, finiteAlways(GetOrientation()));
+            }
         }
         else
         {

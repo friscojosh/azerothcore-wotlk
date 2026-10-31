@@ -16,6 +16,7 @@
  */
 
 #include "Corpse.h"
+#include "PracticeInstances.h"
 #include "CharacterCache.h"
 #include "DBCStores.h"
 #include "Common.h"
@@ -102,6 +103,12 @@ void Corpse::SaveToDB()
     // prevent DB data inconsistence problems and duplicates
     CharacterDatabaseTransaction trans = CharacterDatabase.BeginTransaction();
     DeleteFromDB(trans);
+    if (sPracticeInstances->IsOwned(GetInstanceId()))
+    {
+        // AzPractice (0021): a corpse in an owned instance lives in memory only (its owner's older row still goes)
+        CharacterDatabase.CommitTransaction(trans);
+        return;
+    }
 
     CharacterDatabasePreparedStatement* stmt = CharacterDatabase.GetPreparedStatement(CHAR_INS_CORPSE);
     stmt->SetData(0, GetOwnerGUID().GetCounter());                            // guid

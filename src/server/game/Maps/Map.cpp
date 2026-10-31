@@ -2410,6 +2410,10 @@ Map::EnterState BattlegroundMap::CannotEnter(Player* player, bool loginCheck)
     if (player->GetBattlegroundId() != GetInstanceId())
         return CANNOT_ENTER_INSTANCE_BIND_MISMATCH;
 
+    // AzPractice (0021): a practice session's member takes no part in PvP (port and login-resume)
+    if (sPracticeInstances->IsMember(player->GetGUID()))
+        return CANNOT_ENTER_UNSPECIFIED_REASON;
+
     // pussywizard: no need to check player limit here, invitations are limited by Battleground::GetFreeSlotsForTeam
 
     return Map::CannotEnter(player, loginCheck);
@@ -2417,6 +2421,8 @@ Map::EnterState BattlegroundMap::CannotEnter(Player* player, bool loginCheck)
 
 bool BattlegroundMap::AddPlayerToMap(Player* player)
 {
+    if (sPracticeInstances->IsMember(player->GetGUID()))  // AzPractice (0021): login-resume included
+        return false;
     player->m_InstanceValid = true;
     if (IsBattleArena())
         player->CastSpell(player, 100102, true);

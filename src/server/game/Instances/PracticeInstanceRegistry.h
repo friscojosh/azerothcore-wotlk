@@ -58,15 +58,39 @@ public:
         for (auto it = _groups.begin(); it != _groups.end();)
             it = it->second == token ? _groups.erase(it) : std::next(it);
         std::vector<uint32_t> out;
-        for (auto& [id, o] : _instances)
-            if (o.token == token)
+        for (auto it = _instances.begin(); it != _instances.end();)
+        {
+            if (it->second.token != token)
+                ++it;
+            else if (it->second.lost)
+                it = _instances.erase(it);  // its save is already gone
+            else
             {
-                o.released = true;
-                out.push_back(id);
+                it->second.released = true;
+                out.push_back(it->first);
+                ++it;
             }
+        }
         return out;
     }
-    void Forget(uint32_t instanceId) { _instances.erase(instanceId); }
+    // The core deleted the instance's save. While its session is live the entry stays (lost): its members' route still
+    // names it, so their entry fails closed instead of falling back to ordinary routing.
+    void Forget(uint32_t instanceId)
+    {
+        auto it = _instances.find(instanceId);
+        if (it == _instances.end())
+            return;
+        if (it->second.released)
+            _instances.erase(it);
+        else
+            it->second.lost = true;
+    }
+    void Disown(uint32_t instanceId) { _instances.erase(instanceId); }  // a failed allocation
+    bool IsLost(uint32_t instanceId) const
+    {
+        auto it = _instances.find(instanceId);
+        return it != _instances.end() && it->second.lost;
+    }
 
     bool Active() const { return !_instances.empty() || !_members.empty() || !_groups.empty(); }
     bool IsOwned(uint32_t instanceId) const { return instanceId && _instances.count(instanceId); }
@@ -129,6 +153,7 @@ private:
         uint64_t token = 0;
         uint32_t mapId = 0;
         bool released = false;
+        bool lost = false;
     };
     uint64_t _lastToken = 0;
     std::unordered_map<uint32_t, Owned> _instances;

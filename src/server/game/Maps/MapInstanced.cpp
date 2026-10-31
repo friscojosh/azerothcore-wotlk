@@ -52,7 +52,8 @@ void MapInstanced::Update(const uint32 t, const uint32 s_diff, bool /*thread*/)
 
     while (i != m_InstancedMaps.end())
     {
-        if (i->second->CanUnload(t))
+        // AzPractice (0021): an owned instance stays loaded (with its unwritten save) while its session is live
+        if (i->second->CanUnload(t) && !sPracticeInstances->IsLiveOwned(i->first))
         {
             if (!DestroyInstance(i))                             // iterator incremented
             {
@@ -139,6 +140,10 @@ Map* MapInstanced::CreateInstanceForPlayer(const uint32 mapId, Player* player)
     else
     {
         Difficulty realdiff = player->GetDifficulty(IsRaid());
+        // AzPractice (0021): a member whose session instance is gone fails closed, never ordinary routing
+        if (uint32 owned = sPracticeInstances->RouteFor(player->GetGUID(), GetId()))
+            if (!sInstanceSaveMgr->GetInstanceSave(owned))
+                return nullptr;
         uint32 destInstId = sInstanceSaveMgr->PlayerGetDestinationInstanceId(player, GetId(), realdiff);
 
         if (destInstId)

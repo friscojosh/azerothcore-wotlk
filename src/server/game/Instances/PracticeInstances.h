@@ -65,6 +65,9 @@ public:
     bool MayCreateGroup(ObjectGuid leader);
     bool MayJoinGroup(ObjectGuid player, ObjectGuid group);
     bool MayChangeGroup(ObjectGuid group);                  // remove, leader, disband
+    bool IsMember(ObjectGuid player);                       // a registered member of a live session
+    bool IsSessionGroup(ObjectGuid group);                  // a live session's guarded group (no instance resets)
+    bool IsLiveOwned(uint32 instanceId);                    // owned by a session that has not been released
     void OnInstanceDeleted(uint32 instanceId);
 
 private:

@@ -16,6 +16,7 @@
  */
 
 #include "Spell.h"
+#include <atomic>
 #include "ArenaSpectator.h"
 #include "BattlefieldMgr.h"
 #include "Battleground.h"
@@ -605,11 +606,27 @@ SpellValue::SpellValue(SpellInfo const* proto)
     ForcedCritResult = false;
 }
 
+// AzPractice (0021): spell execution identity (Spell::GetOccurrenceId / ExecutingOccurrence).
+namespace
+{
+std::atomic<uint64> s_nextOccurrenceId{ 0 };
+thread_local uint64 tl_executingOccurrence = 0;
+struct ExecutingScope
+{
+    explicit ExecutingScope(uint64 id) : previous(tl_executingOccurrence) { tl_executingOccurrence = id; }
+    ~ExecutingScope() { tl_executingOccurrence = previous; }
+    uint64 previous;
+};
+}
+
+uint64 Spell::ExecutingOccurrence() { return tl_executingOccurrence; }
+
 Spell::Spell(WorldObject* caster, SpellInfo const* info, TriggerCastFlags triggerFlags, ObjectGuid originalCasterGUID, bool skipCheck) :
     m_spellInfo(sSpellMgr->GetSpellForDifficultyFromSpell(info, caster)),
     m_caster((info->HasAttribute(SPELL_ATTR6_ORIGINATE_FROM_CONTROLLER) && caster->ToUnit() && caster->ToUnit()->GetCharmerOrOwner()) ? caster->ToUnit()->GetCharmerOrOwner() : caster)
     , m_spellValue(new SpellValue(m_spellInfo)), _spellEvent(nullptr)
 {
+    m_occurrenceId = ++s_nextOccurrenceId;
     m_customError = SPELL_CUSTOM_ERROR_NONE;
     m_skipCheck = skipCheck;
     m_selfContainer = nullptr;
@@ -3910,6 +3927,7 @@ void Spell::cast(bool skipCheck)
 
 void Spell::_cast(bool skipCheck)
 {
+    ExecutingScope const executing(m_occurrenceId);  // AzPractice (0021)
     Unit* unitCaster = m_caster->ToUnit();
     // update pointers base at GUIDs to prevent access to non-existed already object
     if (!UpdatePointers())
@@ -4217,6 +4235,7 @@ void Spell::_cast(bool skipCheck)
 
 void Spell::handle_immediate()
 {
+    ExecutingScope const executing(m_occurrenceId);  // AzPractice (0021)
     Unit* unitCaster = m_caster->ToUnit();
     // start channeling if applicable
     if (m_spellInfo->IsChanneled())
@@ -4288,6 +4307,7 @@ void Spell::handle_immediate()
 
 uint64 Spell::handle_delayed(uint64 t_offset)
 {
+    ExecutingScope const executing(m_occurrenceId);  // AzPractice (0021)
     if (!UpdatePointers())
     {
         // finish the spell if UpdatePointers() returned false, something wrong happened there

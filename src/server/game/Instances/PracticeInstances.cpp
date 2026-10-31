@@ -71,7 +71,9 @@ uint32 PracticeInstances::Allocate(uint64 token, uint32 mapId, Difficulty diffic
     }
     if (!sInstanceSaveMgr->AddInstanceSave(mapId, id, difficulty))
     {
-        OnInstanceDeleted(id);
+        std::lock_guard<std::mutex> g(_lock);
+        _r.Disown(id);
+        Refresh();
         return 0;
     }
     LOG_INFO("maps", "AzPractice: instance {} of map {} (difficulty {}) allocated for practice session {} (nonpersistent)", id, mapId,
@@ -149,6 +151,30 @@ bool PracticeInstances::MayChangeGroup(ObjectGuid group)
         return true;
     std::lock_guard<std::mutex> g(_lock);
     return _r.MayChange(group.GetRawValue(), tl_authorized);
+}
+
+bool PracticeInstances::IsMember(ObjectGuid player)
+{
+    if (Inert())
+        return false;
+    std::lock_guard<std::mutex> g(_lock);
+    return _r.TokenOf(player.GetRawValue()) != 0;
+}
+
+bool PracticeInstances::IsSessionGroup(ObjectGuid group)
+{
+    if (Inert())
+        return false;
+    std::lock_guard<std::mutex> g(_lock);
+    return _r.GroupToken(group.GetRawValue()) != 0;
+}
+
+bool PracticeInstances::IsLiveOwned(uint32 instanceId)
+{
+    if (Inert() || !instanceId)
+        return false;
+    std::lock_guard<std::mutex> g(_lock);
+    return _r.OwnerOf(instanceId) != 0;
 }
 
 void PracticeInstances::OnInstanceDeleted(uint32 instanceId)
