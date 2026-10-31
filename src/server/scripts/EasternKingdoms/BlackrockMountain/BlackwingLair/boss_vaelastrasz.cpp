@@ -273,6 +273,26 @@ struct boss_vaelastrasz : public BossAI
         }
     }
 
+    // AzBots BWL/AQ40 timers (0019): GetData(18173) = milliseconds until the next Burning Adrenaline PLUS ONE
+    // (0 = none scheduled); GetData(1) = which cast comes next, 0-1 a random mana user, 2 his victim (the tank).
+    // No behaviour changes.
+    uint32 GetData(uint32 type) const override
+    {
+        if (type == SPELL_BURNING_ADRENALINE)
+            return AzUntil(events, EVENT_BURNING_ADRENALINE);
+        if (type == 1)
+            return _burningAdrenalineCast;
+        return 0;
+    }
+
+    static uint32 AzUntil(EventMap const& ev, uint32 eventId)
+    {
+        Milliseconds const until = ev.GetTimeUntilEvent(eventId);
+        if (until == Milliseconds::max())
+            return 0;
+        return uint32(std::max<int64>(until.count(), 0)) + 1;
+    }
+
 private:
     ObjectGuid PlayerGUID;
     ObjectGuid m_nefariusGuid;

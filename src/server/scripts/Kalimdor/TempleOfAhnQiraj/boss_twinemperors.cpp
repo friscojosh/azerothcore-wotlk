@@ -17,6 +17,7 @@
 
 #include "AreaTriggerScript.h"
 #include "CreatureScript.h"
+#include "GameTime.h"
 #include "Player.h"
 #include "ScriptedCreature.h"
 #include "SpellScript.h"
@@ -323,6 +324,8 @@ struct boss_veklor : public boss_twinemperorsAI
     void JustEngagedWith(Unit* who) override
     {
         boss_twinemperorsAI::JustEngagedWith(who);
+        _nextTeleportAt = GameTime::GetGameTimeMS() + 30s;
+        _teleports = 0;
 
         DoPlaySoundToSet(me, SOUND_VK_AGGRO);
 
@@ -358,7 +361,9 @@ struct boss_veklor : public boss_twinemperorsAI
             .Schedule(30s, [this](TaskContext context)
             {
                 DoCastSelf(SPELL_TWIN_TELEPORT_0);
-                context.Repeat(30s, 40s);
+                Milliseconds const next = randtime(30s, 40s);
+                _nextTeleportAt = GameTime::GetGameTimeMS() + next;
+                context.Repeat(next);
             })
             .Schedule(5s, [this](TaskContext context)
             {
@@ -386,9 +391,30 @@ struct boss_veklor : public boss_twinemperorsAI
 
                 veknilash->AI()->DoAction(ACTION_AFTER_TELEPORT);
                 DoAction(ACTION_AFTER_TELEPORT);
+                ++_teleports;
             }
         }
     }
+
+    // AzBots BWL/AQ40 timers (0019): GetData(799) = milliseconds until the next Twin Teleport PLUS ONE (0 = not
+    // fighting); GetData(1000799) = how many teleports have happened this engagement (the teleport epoch).
+    // No behaviour changes.
+    uint32 GetData(uint32 type) const override
+    {
+        if (type == SPELL_TWIN_TELEPORT_0)
+        {
+            if (!me->IsInCombat() || _nextTeleportAt == Milliseconds::zero())
+                return 0;
+            Milliseconds const now = GameTime::GetGameTimeMS();
+            return uint32(std::max<int64>((_nextTeleportAt - now).count(), 0)) + 1;
+        }
+        if (type == 1000000 + SPELL_TWIN_TELEPORT_0)
+            return _teleports;
+        return 0;
+    }
+
+    Milliseconds _nextTeleportAt = Milliseconds::zero();
+    uint32 _teleports = 0;
 
     void AttackStart(Unit* who) override
     {

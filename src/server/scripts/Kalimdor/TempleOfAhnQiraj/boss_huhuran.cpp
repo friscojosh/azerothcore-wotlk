@@ -130,6 +130,25 @@ struct boss_huhuran : public BossAI
         DoMeleeAttackIfReady();
     }
 
+    // AzBots BWL/AQ40 timers (0019): GetData(26051) = milliseconds until the next Frenzy PLUS ONE, GetData(26180)
+    // the same for Wyvern Sting; 0 = none scheduled (Frenzy is cancelled at Berserk). No behaviour changes.
+    uint32 GetData(uint32 type) const override
+    {
+        if (type == SPELL_FRENZY)
+            return AzUntil(events, EVENT_FRENZY);
+        if (type == SPELL_WYVERN_STING)
+            return AzUntil(events, EVENT_WYVERN_STING);
+        return 0;
+    }
+
+    static uint32 AzUntil(EventMap const& ev, uint32 eventId)
+    {
+        Milliseconds const until = ev.GetTimeUntilEvent(eventId);
+        if (until == Milliseconds::max())
+            return 0;
+        return uint32(std::max<int64>(until.count(), 0)) + 1;
+    }
+
 private:
     bool _berserk;
     bool _hardEnrage;

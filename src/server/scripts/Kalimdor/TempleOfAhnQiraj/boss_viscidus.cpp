@@ -120,6 +120,7 @@ struct boss_viscidus : public BossAI
         BossAI::Reset();
         SoftReset();
         me->RemoveAurasDueToSpell(SPELL_VISCIDUS_SHRINKS);
+        _practiceKillReached = false;
     }
 
     void SoftReset()
@@ -158,6 +159,14 @@ struct boss_viscidus : public BossAI
         {
             if (me->GetHealthPct() <= 5.f)
             {
+                // AzPractice no-kill (0019): with the practice flag set the shatter that would kill him does not.
+                // No phase change (a glob shatter at <= 5% would make no globs and leave him invisible); he stays
+                // frozen until EVENT_RESET_PHASE and practice ends the attempt as a simulated kill.
+                if (_practiceNoKill)
+                {
+                    _practiceKillReached = true;
+                    return;
+                }
                 Unit::Kill(attacker, me);
                 return;
             }
@@ -313,9 +322,43 @@ struct boss_viscidus : public BossAI
             DoMeleeAttackIfReady();
     }
 
+    // AzPractice (0019). SetData(DATA_PRACTICE_NO_KILL, 1) removes the <= 5% Unit::Kill branch above for a
+    // practice attempt (it survives Reset; the AI is rebuilt on respawn, so practice re-checks the read-back);
+    // SetData(3, 0) clears the kill-reached mark. GetData(DATA_PRACTICE_NO_KILL) = the flag, GetData(1) = the phase
+    // (1 frost, 2 frozen/melee, 3 globs), GetData(2) = the hit counter, GetData(3) = 1 once a shatter would have
+    // killed him. Unset, nothing changes.
+    static constexpr uint32 DATA_PRACTICE_NO_KILL = 1000;
+
+    void SetData(uint32 type, uint32 data) override
+    {
+        if (type == DATA_PRACTICE_NO_KILL)
+            _practiceNoKill = data != 0;
+        else if (type == 3 && data == 0)
+            _practiceKillReached = false;
+    }
+
+    uint32 GetData(uint32 type) const override
+    {
+        switch (type)
+        {
+            case DATA_PRACTICE_NO_KILL:
+                return _practiceNoKill ? 1 : 0;
+            case 1:
+                return _phase;
+            case 2:
+                return _hitcounter;
+            case 3:
+                return _practiceKillReached ? 1 : 0;
+            default:
+                return 0;
+        }
+    }
+
 private:
     uint8 _hitcounter;
     uint8 _phase;
+    bool _practiceNoKill = false;
+    bool _practiceKillReached = false;
 };
 
 struct boss_glob_of_viscidus : public ScriptedAI
