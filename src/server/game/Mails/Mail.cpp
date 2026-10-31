@@ -92,20 +92,35 @@ MailReceiver::MailReceiver(Player* receiver, ObjectGuid::LowType receiver_lowgui
     ASSERT(!receiver || receiver->GetGUID().GetCounter() == receiver_lowguid);
 }
 
+// AzParty transient: does `owner` still hold this very object anywhere (inventory, bags, bank, buyback, mail)?
+static bool AzPartyHoldsItem(Player const* owner, Item const* item)
+{
+    if (owner->GetItemByGuid(item->GetGUID()) == item)
+        return true;
+    for (uint8 slot = BUYBACK_SLOT_START; slot < BUYBACK_SLOT_END; ++slot)   // not searched by GetItemByGuid
+        if (owner->GetItemByPos(INVENTORY_SLOT_BAG_0, slot) == item)
+            return true;
+    return const_cast<Player*>(owner)->GetMItem(item->GetGUID().GetCounter()) == item;
+}
+
 MailDraft& MailDraft::AddItem(Item* item)
 {
     // AzParty transient: backstop behind Item::CanBeTraded. A transient item is never mailed (its
-    // mail_items/item_instance rows would make it permanent). Callers pass a detached item; free it.
+    // mail_items/item_instance rows would make it permanent). It is freed only when provably unowned:
+    // no connected player (in world or not) holds it in any store and it is in no update queue.
+    // Otherwise it is refused and left alone (a leak at worst, never a dangling pointer).
     if (item->IsTransient())
     {
-        Player* owner = item->GetOwner();
-        bool const attached = owner && owner->GetItemByGuid(item->GetGUID()) == item;
+        Player* owner = ObjectAccessor::FindConnectedPlayer(item->GetOwnerGUID());
+        bool const held = owner && AzPartyHoldsItem(owner, item);
+        if (!held && owner && item->IsInUpdateQueue())
+            item->RemoveFromUpdateQueueOf(owner);   // may refuse (queue blocked): checked below
+        bool const freeable = !held && !item->IsInUpdateQueue();
         LOG_ERROR("entities.player.items", "MailDraft::AddItem: refusing transient item {} (entry {}, owner {}, {})",
-            item->GetGUID().ToString(), item->GetEntry(), item->GetOwnerGUID().ToString(), attached ? "still held, kept" : "detached, destroyed");
-        if (!attached)
+            item->GetGUID().ToString(), item->GetEntry(), item->GetOwnerGUID().ToString(),
+            held ? "still held, kept" : (freeable ? "detached, destroyed" : "still queued, kept"));
+        if (freeable)
         {
-            if (owner)
-                item->RemoveFromUpdateQueueOf(owner);
             if (item->IsInWorld())
                 item->RemoveFromWorld();
             delete item;
