@@ -1909,6 +1909,11 @@ InventoryResult Player::CanEquipItem(uint8 slot, uint16& dest, Item* pItem, bool
         ItemTemplate const* pProto = pItem->GetTemplate();
         if (pProto)
         {
+            // AzParty transient: a transient item is equipped (or moved, e.g. auto-equip into the empty
+            // paired ring/trinket slot) only by the module that supplied it, under its bypass.
+            if (pItem->IsTransient() && !TransientItemBypass::IsActive())
+                return EQUIP_ERR_CANT_DO_RIGHT_NOW;
+
             if (!sScriptMgr->OnPlayerCanEquipItem(const_cast<Player*>(this), slot, dest, pItem, swap, not_loading))
                 return EQUIP_ERR_CANT_DO_RIGHT_NOW;
 
@@ -2098,6 +2103,11 @@ InventoryResult Player::CanUnequipItem(uint16 pos, bool swap) const
     // Applied only to existed equipped item
     if (!pItem)
         return EQUIP_ERR_OK;
+
+    // AzParty transient: an equipped transient item leaves equipment only under the supply bypass
+    // (covers swap, auto-store, equipped destroy, and CanBeTraded's own unequip check)
+    if (pItem->IsTransient() && !TransientItemBypass::IsActive())
+        return EQUIP_ERR_CANT_DO_RIGHT_NOW;
 
     LOG_DEBUG("entities.player.items", "STORAGE: CanUnequipItem slot = {}, item = {}, count = {}", pos, pItem->GetEntry(), pItem->GetCount());
 
@@ -2811,6 +2821,15 @@ Item* Player::_StoreItem(uint16 pos, Item* pItem, uint32 count, bool clone, bool
     }
     else
     {
+        // AzParty transient: never merge a transient item into a stack or a stack into one. Supplied
+        // items are not stackable, so this cannot happen; refuse loudly rather than move value.
+        if (pItem->IsTransient() || pItem2->IsTransient())
+        {
+            LOG_ERROR("entities.player.items", "Player::_StoreItem: refusing to merge transient item ({} into {}) for player {}",
+                pItem->GetGUID().ToString(), pItem2->GetGUID().ToString(), GetGUID().ToString());
+            return nullptr;
+        }
+
         if (pItem2->GetTemplate()->Bonding == BIND_WHEN_PICKED_UP ||
             pItem2->GetTemplate()->Bonding == BIND_QUEST_ITEM ||
             (pItem2->GetTemplate()->Bonding == BIND_WHEN_EQUIPPED && IsBagPos(pos)))
@@ -3275,7 +3294,7 @@ void Player::DestroyItemCount(uint32 itemEntry, uint32 count, bool update, bool 
     {
         if (Item* item = GetItemByPos(INVENTORY_SLOT_BAG_0, i))
         {
-            if (item->GetEntry() == itemEntry && !item->IsInTrade())
+            if (item->GetEntry() == itemEntry && !item->IsInTrade() && !item->IsTransient()) // AzParty transient: skipped
             {
                 if (item->GetCount() + remcount <= count)
                 {
@@ -3303,7 +3322,7 @@ void Player::DestroyItemCount(uint32 itemEntry, uint32 count, bool update, bool 
     {
         if (Item* item = GetItemByPos(INVENTORY_SLOT_BAG_0, i))
         {
-            if (item->GetEntry() == itemEntry && !item->IsInTrade())
+            if (item->GetEntry() == itemEntry && !item->IsInTrade() && !item->IsTransient()) // AzParty transient: skipped
             {
                 if (item->GetCount() + remcount <= count)
                 {
@@ -3336,7 +3355,7 @@ void Player::DestroyItemCount(uint32 itemEntry, uint32 count, bool update, bool 
             {
                 if (Item* item = bag->GetItemByPos(j))
                 {
-                    if (item->GetEntry() == itemEntry && !item->IsInTrade())
+                    if (item->GetEntry() == itemEntry && !item->IsInTrade() && !item->IsTransient()) // AzParty transient: skipped
                     {
                         // all items in bags can be unequipped
                         if (item->GetCount() + remcount <= count)
@@ -3367,7 +3386,7 @@ void Player::DestroyItemCount(uint32 itemEntry, uint32 count, bool update, bool 
     {
         if (Item* item = GetItemByPos(INVENTORY_SLOT_BAG_0, i))
         {
-            if (item && item->GetEntry() == itemEntry && !item->IsInTrade())
+            if (item && item->GetEntry() == itemEntry && !item->IsInTrade() && !item->IsTransient()) // AzParty transient: skipped
             {
                 if (item->GetCount() + remcount <= count)
                 {
@@ -3398,7 +3417,7 @@ void Player::DestroyItemCount(uint32 itemEntry, uint32 count, bool update, bool 
     {
         if (Item* item = GetItemByPos(INVENTORY_SLOT_BAG_0, i))
         {
-            if (item->GetEntry() == itemEntry && !item->IsInTrade())
+            if (item->GetEntry() == itemEntry && !item->IsInTrade() && !item->IsTransient()) // AzParty transient: skipped
             {
                 if (item->GetCount() + remcount <= count)
                 {
@@ -3429,7 +3448,7 @@ void Player::DestroyItemCount(uint32 itemEntry, uint32 count, bool update, bool 
             {
                 if (Item* item = bag->GetItemByPos(j))
                 {
-                    if (item->GetEntry() == itemEntry && !item->IsInTrade())
+                    if (item->GetEntry() == itemEntry && !item->IsInTrade() && !item->IsTransient()) // AzParty transient: skipped
                     {
                         // all items in bags can be unequipped
                         if (item->GetCount() + remcount <= count)
@@ -3544,6 +3563,9 @@ Item* Player::GetItemByEntry(uint32 entry) const
 void Player::DestroyItemCount(Item* pItem, uint32& count, bool update)
 {
     if (!pItem)
+        return;
+
+    if (pItem->IsTransient()) // AzParty transient: never consumed by count
         return;
 
     LOG_DEBUG("entities.player.items", "STORAGE: DestroyItemCount item ({}, Entry: {}) count = {}", pItem->GetGUID().ToString(), pItem->GetEntry(), count);
@@ -4284,6 +4306,9 @@ void Player::UpdateSoulboundTradeItems()
 
 void Player::AddTradeableItem(Item* item)
 {
+    if (item->IsTransient()) // AzParty transient: no BoP-trade window (invariant)
+        return;
+
     std::lock_guard<std::mutex> guard(m_soulboundTradableLock);
     m_itemSoulboundTradeable.push_back(item);
 }
@@ -7490,6 +7515,9 @@ void Player::_SaveInventory(CharacterDatabaseTransaction trans)
         if (!item)
             continue;
 
+        if (item->IsTransient()) // AzParty transient: no SQL for a transient item, even in buyback
+            continue;
+
         if (item->GetState() == ITEM_NEW)
         {
             // Xinef: item is removed, remove loot from storage if any
@@ -7550,6 +7578,15 @@ void Player::_SaveInventory(CharacterDatabaseTransaction trans)
         Item* item = m_itemUpdateQueue[i];
         if (!item)
             continue;
+
+        // AzParty transient: before the consistency checks below (they can write
+        // CHAR_DEL_CHAR_INVENTORY_BY_BAG_SLOT). SaveToDB does the state/lifetime cleanup exactly once
+        // (frees a REMOVED item, otherwise UNCHANGED) and appends no SQL; the queue is cleared below.
+        if (item->IsTransient())
+        {
+            item->SaveToDB(trans);
+            continue;
+        }
 
         Bag* container = item->GetContainer();
         ObjectGuid::LowType bag_guid = container ? container->GetGUID().GetCounter() : 0;

@@ -1834,7 +1834,8 @@ void WorldSession::HandleEquipmentSetSave(WorldPacket& recvData)
 
         // xinef: some cheating checks
         Item* item = _player->GetItemByPos(INVENTORY_SLOT_BAG_0, i);
-        if (!item || item->GetGUID() != itemGuid)
+        // AzParty transient: a transient item's GUID is stored as 0 (empty slot), never persisted
+        if (!item || item->GetGUID() != itemGuid || item->IsTransient())
         {
             eqSet.Items[i].Clear();
             continue;

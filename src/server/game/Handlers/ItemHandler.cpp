@@ -1230,6 +1230,10 @@ void WorldSession::HandleSocketOpcode(WorldPackets::Item::SocketGems& packet)
     if (!itemProto)
         return;
 
+    // AzParty transient: a transient item is never socketed (gems would be destroyed into it)
+    if (itemTarget->IsTransient())
+        return;
+
     //this slot is excepted when applying / removing meta gem bonus
     uint8 slot = itemTarget->IsEquipped() ? itemTarget->GetSlot() : uint8(NULL_SLOT);
 
@@ -1483,6 +1487,10 @@ void WorldSession::HandleItemTextQuery(WorldPacket& recvData )
 
 bool WorldSession::recoveryItem(Item* pItem)
 {
+    // AzParty transient: no recovery_item row (.item restore would turn it into an ordinary item)
+    if (pItem->IsTransient())
+        return false;
+
     if (sWorld->getBoolConfig(CONFIG_ITEMDELETE_METHOD)
             && pItem->GetTemplate()->Quality >= sWorld->getIntConfig(CONFIG_ITEMDELETE_QUALITY)
             && pItem->GetTemplate()->ItemLevel >= sWorld->getIntConfig(CONFIG_ITEMDELETE_ITEM_LEVEL))

@@ -174,6 +174,27 @@ void RemoveItemsSetItem(Player* player, ItemTemplate const* proto)
     }
 }
 
+// AzParty transient: the supply bypass (see TransientItemBypass in Item.h).
+namespace
+{
+    thread_local bool s_transientItemBypass = false;
+}
+
+TransientItemBypass::TransientItemBypass() : _previous(s_transientItemBypass)
+{
+    s_transientItemBypass = true;
+}
+
+TransientItemBypass::~TransientItemBypass()
+{
+    s_transientItemBypass = _previous;
+}
+
+bool TransientItemBypass::IsActive()
+{
+    return s_transientItemBypass;
+}
+
 bool ItemCanGoIntoBag(ItemTemplate const* pProto, ItemTemplate const* pBagProto)
 {
     if (!pProto || !pBagProto)
@@ -336,6 +357,20 @@ void Item::UpdateDuration(Player* owner, uint32 diff)
 
 void Item::SaveToDB(CharacterDatabaseTransaction trans)
 {
+    // AzParty transient: no SQL, ever. Only the state/lifetime cleanup the normal path does:
+    // a removed item is freed, anything else becomes UNCHANGED (which clears the queue index).
+    if (m_transient)
+    {
+        if (uState == ITEM_REMOVED)
+        {
+            delete this;
+            return;
+        }
+
+        SetState(ITEM_UNCHANGED);
+        return;
+    }
+
     bool isInTransaction = static_cast<bool>(trans);
     if (!isInTransaction)
         trans = CharacterDatabase.BeginTransaction();
@@ -526,6 +561,9 @@ void Item::DeleteFromDB(CharacterDatabaseTransaction trans, ObjectGuid::LowType 
 
 void Item::DeleteFromDB(CharacterDatabaseTransaction trans)
 {
+    if (m_transient) // AzParty transient: it has no row to delete
+        return;
+
     DeleteFromDB(trans, GetGUID().GetCounter());
 }
 
@@ -539,6 +577,9 @@ void Item::DeleteFromInventoryDB(CharacterDatabaseTransaction trans, ObjectGuid:
 
 void Item::DeleteFromInventoryDB(CharacterDatabaseTransaction trans)
 {
+    if (m_transient) // AzParty transient: it has no row to delete
+        return;
+
     DeleteFromInventoryDB(trans, GetGUID().GetCounter());
 }
 
@@ -794,6 +835,10 @@ bool Item::IsEquipped() const
 
 bool Item::CanBeTraded(bool mail, bool trade) const
 {
+    // AzParty transient: never leaves its owner (trade, mail, AH and guild bank all admit through here)
+    if (m_transient)
+        return false;
+
     if ((!mail || !IsBoundAccountWide()) && (IsSoulBound() && (!IsBOPTradable() || !trade)))
         return false;
 
@@ -1139,6 +1184,8 @@ Item* Item::CloneItem(uint32 count, Player const* player) const
     newItem->SetUInt32Value(ITEM_FIELD_GIFTCREATOR,  GetUInt32Value(ITEM_FIELD_GIFTCREATOR));
     newItem->SetUInt32Value(ITEM_FIELD_FLAGS,        GetUInt32Value(ITEM_FIELD_FLAGS) & ~(ITEM_FIELD_FLAG_REFUNDABLE | ITEM_FIELD_FLAG_BOP_TRADEABLE));
     newItem->SetUInt32Value(ITEM_FIELD_DURATION,     GetUInt32Value(ITEM_FIELD_DURATION));
+    if (m_transient)
+        newItem->SetTransient(); // AzParty transient: a copy of a transient item is transient too
     return newItem;
 }
 
@@ -1184,6 +1231,9 @@ void Item::RemoveFromObjectUpdate()
 
 void Item::SaveRefundDataToDB()
 {
+    if (m_transient) // AzParty transient: no refund row (invariant: supplied items never get refund data)
+        return;
+
     CharacterDatabaseTransaction trans = CharacterDatabase.BeginTransaction();
 
     CharacterDatabasePreparedStatement* stmt = CharacterDatabase.GetPreparedStatement(CHAR_DEL_ITEM_REFUND_INSTANCE);

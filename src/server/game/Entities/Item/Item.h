@@ -216,6 +216,36 @@ enum ItemUpdateState
 
 bool ItemCanGoIntoBag(ItemTemplate const* proto, ItemTemplate const* pBagProto);
 
+// AzParty transient items (core patch 0017, duty supply).
+//
+// A transient item lives only in memory on its owner: it is never written to item_instance,
+// character_inventory or any other table, never leaves its owner's equipment (trade, mail, AH,
+// guild bank, recovery, destroy-by-entry, socketing, unequip, relocation are all refused), and a
+// crash, restart or logout simply leaves its slot empty in the saved character. The marker is a
+// C++ member, not an ITEM_FIELD_FLAGS bit (those are sent to clients and saved to the DB).
+//
+// Public API for modules:
+//   Item::SetTransient()  -- one-way; call right after Item::CreateItem, before storing/equipping.
+//   Item::IsTransient()
+//   TransientItemBypass   -- RAII guard. While one is alive on the current thread,
+//                            Player::CanUnequipItem / Player::CanEquipItem let a transient item
+//                            move (equip, unequip, destroy from equipment). Only the owning
+//                            module's own world-thread calls may hold it.
+class TransientItemBypass
+{
+public:
+    TransientItemBypass();
+    ~TransientItemBypass();
+    TransientItemBypass(TransientItemBypass const&) = delete;
+    TransientItemBypass& operator=(TransientItemBypass const&) = delete;
+
+    // AzParty transient: true while a bypass guard is alive on this thread.
+    [[nodiscard]] static bool IsActive();
+
+private:
+    bool _previous;
+};
+
 class Item : public Object
 {
 public:
@@ -238,6 +268,11 @@ public:
     bool IsBindedNotWith(Player const* player) const;
     [[nodiscard]] bool IsBoundByEnchant() const;
     [[nodiscard]] bool IsBoundByTempEnchant() const;
+
+    // AzParty transient (core patch 0017): one-way in-memory marker, see TransientItemBypass above.
+    void SetTransient() { m_transient = true; }
+    [[nodiscard]] bool IsTransient() const { return m_transient; }
+
     virtual void SaveToDB(CharacterDatabaseTransaction trans);
     virtual bool LoadFromDB(ObjectGuid::LowType guid, ObjectGuid owner_guid, Field* fields, uint32 entry);
     static void DeleteFromDB(CharacterDatabaseTransaction trans, ObjectGuid::LowType itemGuid);
@@ -376,5 +411,6 @@ private:
     uint32 m_paidMoney;
     uint32 m_paidExtendedCost;
     AllowedLooterSet allowedGUIDs;
+    bool m_transient = false;                           // AzParty transient: never persisted (core patch 0017)
 };
 #endif

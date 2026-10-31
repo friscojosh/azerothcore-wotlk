@@ -94,6 +94,25 @@ MailReceiver::MailReceiver(Player* receiver, ObjectGuid::LowType receiver_lowgui
 
 MailDraft& MailDraft::AddItem(Item* item)
 {
+    // AzParty transient: backstop behind Item::CanBeTraded. A transient item is never mailed (its
+    // mail_items/item_instance rows would make it permanent). Callers pass a detached item; free it.
+    if (item->IsTransient())
+    {
+        Player* owner = item->GetOwner();
+        bool const attached = owner && owner->GetItemByGuid(item->GetGUID()) == item;
+        LOG_ERROR("entities.player.items", "MailDraft::AddItem: refusing transient item {} (entry {}, owner {}, {})",
+            item->GetGUID().ToString(), item->GetEntry(), item->GetOwnerGUID().ToString(), attached ? "still held, kept" : "detached, destroyed");
+        if (!attached)
+        {
+            if (owner)
+                item->RemoveFromUpdateQueueOf(owner);
+            if (item->IsInWorld())
+                item->RemoveFromWorld();
+            delete item;
+        }
+        return *this;
+    }
+
     m_items[item->GetGUID()] = item;
     return *this;
 }
