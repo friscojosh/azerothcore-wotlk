@@ -16,6 +16,7 @@
  */
 
 #include "InstanceSaveMgr.h"
+#include "PracticeInstances.h"
 #include "Common.h"
 #include "Config.h"
 #include "GameTime.h"
@@ -139,6 +140,7 @@ bool InstanceSaveMgr::DeleteInstanceSaveIfNeeded(InstanceSave* save, bool skipMa
         Map::DeleteRespawnTimesInDB(save->GetMapId(), save->GetInstanceId());
 
         sScriptMgr->OnInstanceIdRemoved(save->GetInstanceId());
+        sPracticeInstances->OnInstanceDeleted(save->GetInstanceId());  // AzPractice (0021)
 
         if (deleteSave)
         {
@@ -165,6 +167,9 @@ InstanceSave::~InstanceSave()
 
 void InstanceSave::InsertToDB()
 {
+    if (sPracticeInstances->IsOwned(m_instanceid))  // AzPractice (0021): a practice-owned instance is never written
+        return;
+
     if (sToCloud9Sidecar->ClusterModeEnabled() && !sToCloud9Sidecar->IsMapAssigned(GetMapId()))
         return;
 
@@ -814,6 +819,8 @@ void InstanceSaveMgr::_ResetOrWarnAll(uint32 mapid, Difficulty difficulty, bool 
 
 InstancePlayerBind* InstanceSaveMgr::PlayerBindToInstance(ObjectGuid guid, InstanceSave* save, bool permanent, Player* player /*= nullptr*/)
 {
+    if (sPracticeInstances->IsOwned(save->GetInstanceId()))  // AzPractice (0021): nobody binds to a practice-owned instance
+        return nullptr;
     bool const persistBinding = !sToCloud9Sidecar->ClusterModeEnabled() || sToCloud9Sidecar->IsMapAssigned(save->GetMapId());
     InstancePlayerBind& bind = playerBindStorage[guid]->m[save->GetDifficulty()][save->GetMapId()];
     ASSERT(!bind.perm || permanent); // ensure there's no changing permanent to temporary, this can be done only by unbinding
@@ -984,6 +991,11 @@ uint32 InstanceSaveMgr::PlayerGetDestinationInstanceId(Player* player, uint32 ma
 {
     // returning 0 means a new instance will be created
     // non-zero implicates that InstanceSave exists
+
+    // AzPractice (0021): a practice session's member goes to its session's own instance.
+    if (uint32 owned = sPracticeInstances->RouteFor(player->GetGUID(), mapid))
+        if (GetInstanceSave(owned))
+            return owned;
 
     InstancePlayerBind* ipb = PlayerGetBoundInstance(player->GetGUID(), mapid, difficulty);
     if (ipb && ipb->perm) // 1. self perm

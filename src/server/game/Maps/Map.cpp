@@ -16,6 +16,7 @@
  */
 
 #include "Map.h"
+#include "PracticeInstances.h"
 #include "Battleground.h"
 #include "CellImpl.h"
 #include "Chat.h"
@@ -2016,6 +2017,10 @@ Map::EnterState InstanceMap::CannotEnter(Player* player, bool loginCheck)
         return CANNOT_ENTER_ALREADY_IN_MAP;
     }
 
+    // AzPractice (0021): only the owning session's members, GMs included
+    if (!sPracticeInstances->MayEnter(player->GetGUID(), GetInstanceId()))
+        return CANNOT_ENTER_UNSPECIFIED_REASON;
+
     // allow GM's to enter
     if (player->IsGameMaster())
         return Map::CannotEnter(player, loginCheck);
@@ -2081,7 +2086,17 @@ bool InstanceMap::AddPlayerToMap(Player* player)
     if (m_resetAfterUnload) // this instance has been reset, it's not meant to be used anymore
         return false;
 
-    if (IsDungeon())
+    // AzPractice (0021): a practice-owned instance admits only its session's members, by any route (login, GM, summon),
+    // and binds nobody: none of the block below (binds, hourly limit, lock warning) applies to it.
+    bool const practiceOwned = sPracticeInstances->IsOwned(GetInstanceId());
+    if (practiceOwned && !sPracticeInstances->MayEnter(player->GetGUID(), GetInstanceId()))
+    {
+        LOG_WARN("maps", "AzPractice: {} ({}) refused entry to practice-owned instance {} of map {}", player->GetName(),
+                 player->GetGUID().ToString(), GetInstanceId(), GetId());
+        return false;
+    }
+
+    if (IsDungeon() && !practiceOwned)
     {
         Group* group = player->GetGroup();
 
@@ -2496,6 +2511,8 @@ void Map::SaveCreatureRespawnTime(ObjectGuid::LowType spawnId, time_t& respawnTi
     _creatureRespawnTimes[spawnId] = respawnTime;
     _respawnQueue.insert({respawnTime, SPAWN_TYPE_CREATURE, spawnId});
 
+    if (sPracticeInstances->IsOwned(GetInstanceId()))  // AzPractice (0021): kept in memory only
+        return;
     CharacterDatabasePreparedStatement* stmt = CharacterDatabase.GetPreparedStatement(CHAR_REP_CREATURE_RESPAWN);
     stmt->SetData(0, spawnId);
     stmt->SetData(1, uint32(respawnTime));
@@ -2541,6 +2558,8 @@ void Map::SaveGORespawnTime(ObjectGuid::LowType spawnId, time_t& respawnTime)
     _goRespawnTimes[spawnId] = respawnTime;
     _respawnQueue.insert({respawnTime, SPAWN_TYPE_GAMEOBJECT, spawnId});
 
+    if (sPracticeInstances->IsOwned(GetInstanceId()))  // AzPractice (0021): kept in memory only
+        return;
     CharacterDatabasePreparedStatement* stmt = CharacterDatabase.GetPreparedStatement(CHAR_REP_GO_RESPAWN);
     stmt->SetData(0, spawnId);
     stmt->SetData(1, uint32(respawnTime));

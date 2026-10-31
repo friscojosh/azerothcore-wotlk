@@ -16,6 +16,7 @@
  */
 
 #include "AccountMgr.h"
+#include "PracticeInstances.h"
 #include "BattlegroundAV.h"
 #include "CellImpl.h"
 #include "CreatureAISelector.h"
@@ -2616,6 +2617,8 @@ void GameObject::SaveStateToDB()
         {
             GOState param = GetGoState();
             instance->StoreGameObjectState(GetSpawnId(), GameobjectStateToInt(&param));
+            if (sPracticeInstances->IsOwned(GetInstanceId()))  // AzPractice (0021): kept in memory only
+                return;
 
             CharacterDatabasePreparedStatement* stmt = CharacterDatabase.GetPreparedStatement(CHAR_INSERT_INSTANCE_SAVED_DATA);
             stmt->SetData(0, GetInstanceId());

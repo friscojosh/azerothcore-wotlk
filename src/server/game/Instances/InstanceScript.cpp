@@ -16,6 +16,7 @@
  */
 
 #include "InstanceScript.h"
+#include "PracticeInstances.h"
 #include "Chat.h"
 #include "Creature.h"
 #include "DatabaseEnv.h"
@@ -43,6 +44,9 @@ BossBoundaryData::~BossBoundaryData()
 void InstanceScript::SaveToDB()
 {
     if (sToCloud9Sidecar->ClusterModeEnabled() && !sToCloud9Sidecar->IsMapAssigned(instance->GetEntry()->MapID))
+        return;
+
+    if (sPracticeInstances->IsOwned(instance->GetInstanceId()))  // AzPractice (0021): never written
         return;
 
     std::string data = GetSaveData();
@@ -764,7 +768,7 @@ void InstanceScript::SetCompletedEncountersMask(uint32 newMask, bool save)
         return;
     completedEncounters = newMask;
     // pussywizard:
-    if (save)
+    if (save && !sPracticeInstances->IsOwned(instance->GetInstanceId()))  // AzPractice (0021): never written
     {
         InstanceSave* iSave = sInstanceSaveMgr->GetInstanceSave(instance->GetInstanceId());
         if (iSave)

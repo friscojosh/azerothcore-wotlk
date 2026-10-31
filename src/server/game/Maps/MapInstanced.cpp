@@ -16,6 +16,7 @@
  */
 
 #include "MapInstanced.h"
+#include "PracticeInstances.h"
 #include "Battleground.h"
 #include "Group.h"
 #include "InstanceSaveMgr.h"
@@ -144,6 +145,8 @@ Map* MapInstanced::CreateInstanceForPlayer(const uint32 mapId, Player* player)
         {
             InstanceSave* pSave = sInstanceSaveMgr->GetInstanceSave(destInstId);
             ASSERT(pSave); // pussywizard: must exist
+            if (sPracticeInstances->IsOwned(destInstId))  // AzPractice (0021): the allocated difficulty, whoever arrives first
+                realdiff = pSave->GetDifficulty();
 
             map = FindInstanceMap(destInstId);
             if (!map)

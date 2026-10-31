@@ -16,6 +16,7 @@
  */
 
 #include "Group.h"
+#include "PracticeInstances.h"
 #include "AreaDefines.h"
 #include "Battleground.h"
 #include "BattlegroundMgr.h"
@@ -143,6 +144,8 @@ Group::~Group()
 bool Group::Create(Player* leader)
 {
     ObjectGuid leaderGuid = leader->GetGUID();
+    if (!sPracticeInstances->MayCreateGroup(leaderGuid))  // AzPractice (0021): a practice member forms no other group
+        return false;
     ObjectGuid::LowType lowguid = sGroupMgr->GenerateGroupId();
 
     m_guid = ObjectGuid::Create<HighGuid::Group>(lowguid);
@@ -429,6 +432,10 @@ bool Group::AddMember(Player* player, uint8 roles /* = 0 */)
     if (!player)
         return false;
 
+    // AzPractice (0021): a practice session's group takes only its members; a member joins no other group
+    if (!sPracticeInstances->MayJoinGroup(player->GetGUID(), GetGUID()))
+        return false;
+
     // Get first not-full group
     uint8 subGroup = 0;
     if (m_subGroupsCounts)
@@ -628,6 +635,9 @@ void Group::AddMemberWithGuid(ObjectGuid guid)
 
 bool Group::RemoveMember(ObjectGuid guid, RemoveMethod const& method /*= GROUP_REMOVEMETHOD_DEFAULT*/, ObjectGuid kicker /*= ObjectGuid::Empty*/, char const* reason /*= nullptr*/)
 {
+    if (!sPracticeInstances->MayChangeGroup(GetGUID()))  // AzPractice (0021): only the session's own operation
+        return false;
+
     BroadcastGroupUpdate();
 
     // LFG group vote kick handled in scripts
@@ -777,6 +787,9 @@ bool Group::RemoveMember(ObjectGuid guid, RemoveMethod const& method /*= GROUP_R
 
 void Group::ChangeLeader(ObjectGuid newLeaderGuid)
 {
+    if (!sPracticeInstances->MayChangeGroup(GetGUID()))  // AzPractice (0021): only the session's own operation
+        return;
+
     member_witerator slot = _getMemberWSlot(newLeaderGuid);
 
     if (slot == m_memberSlots.end())
@@ -818,6 +831,9 @@ void Group::ChangeLeader(ObjectGuid newLeaderGuid)
 
 void Group::ForcedDisband(bool hideDestroy /* = false */)
 {
+    if (!sPracticeInstances->MayChangeGroup(GetGUID()))  // AzPractice (0021): only the session's own operation
+        return;
+
     sScriptMgr->OnGroupDisband(this);
 
     Player* player;
