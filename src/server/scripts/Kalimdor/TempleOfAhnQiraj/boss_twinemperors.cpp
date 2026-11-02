@@ -16,8 +16,11 @@
  */
 
 #include "AreaTriggerScript.h"
+#include "Cell.h"
+#include "CellImpl.h"
 #include "CreatureScript.h"
 #include "GameTime.h"
+#include "GridNotifiers.h"
 #include "Player.h"
 #include "ScriptedCreature.h"
 #include "SpellScript.h"
@@ -116,6 +119,35 @@ struct boss_twinemperorsAI : public BossAI
         }
     }
 
+    // AzBots Twins pick (0023): the nearest hostile unit by straight 3D centre distance.
+    // Creature::SelectNearestTarget (NearestHostileUnitCheck) narrows its range to each accepted unit's
+    // GetDistance() - centre distance minus both combat reaches - and only accepts later units within that
+    // centre distance, so which unit wins among those near the twin depends on the order the grid is visited:
+    // a unit within a few yards of contact, visited first, beats any nearer one. This picks the unit at the
+    // smallest GetExactDist() among the same candidates (alive, hostile, a valid attack target, pets and totems
+    // included as before), ties by GUID. Only the post-teleport pick uses it; nothing else changes.
+    Unit* SelectNearestTargetExact() const
+    {
+        std::list<Unit*> units;
+        Acore::AnyUnfriendlyUnitInObjectRangeCheck check(me, me, MAX_VISIBILITY_DISTANCE);
+        Acore::UnitListSearcher<Acore::AnyUnfriendlyUnitInObjectRangeCheck> searcher(me, units, check);
+        Cell::VisitObjects(me, searcher, MAX_VISIBILITY_DISTANCE);
+        Unit* best = nullptr;
+        float bestDist = 0.0f;
+        for (Unit* u : units)
+        {
+            if (!me->IsValidAttackTarget(u))
+                continue;
+            float const d = me->GetExactDist(u);
+            if (!best || d < bestDist || (d == bestDist && u->GetGUID() < best->GetGUID()))
+            {
+                best = u;
+                bestDist = d;
+            }
+        }
+        return best;
+    }
+
     void KilledUnit(Unit* victim) override
     {
         if (victim && victim->IsPlayer())
@@ -161,7 +193,7 @@ struct boss_twinemperorsAI : public BossAI
             {
                 me->SetReactState(REACT_AGGRESSIVE);
                 me->SetControlled(false, UNIT_STATE_ROOT);
-                if (Unit* victim = me->SelectNearestTarget())
+                if (Unit* victim = SelectNearestTargetExact())
                 {
                     me->AddThreat(victim, 2000.f);
                     AttackStart(victim);
