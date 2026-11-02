@@ -205,6 +205,12 @@ struct boss_twinemperorsAI : public BossAI
                 if (Unit* victim = SelectNearestTargetExact())
                 {
                     me->AddThreat(victim, 2000.f);
+                    // AzBots Twins pick reselect (0025): choose the victim from the threat list now. The threat
+                    // manager only reselects its current victim once a second (THREAT_UPDATE_INTERVAL), so the unit
+                    // it chose during the 2 s passive window - often one with no threat since the wipe - stayed the
+                    // AI's victim and AttackStart(victim) was undone on the next UpdateVictim (staging: the picked
+                    // unit was the victim for 8-20 ms). The usual 110%/130% rules against that victim still apply.
+                    me->GetThreatMgr().UpdateVictimForTesting();
                     AttackStart(victim);
                 }
             });
