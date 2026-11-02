@@ -21,6 +21,7 @@
 #include "CreatureScript.h"
 #include "GameTime.h"
 #include "GridNotifiers.h"
+#include "GridNotifiersImpl.h"
 #include "Player.h"
 #include "ScriptedCreature.h"
 #include "SpellScript.h"
@@ -126,26 +127,34 @@ struct boss_twinemperorsAI : public BossAI
     // a unit within a few yards of contact, visited first, beats any nearer one. This picks the unit at the
     // smallest GetExactDist() among the same candidates (alive, hostile, a valid attack target, pets and totems
     // included as before), ties by GUID. Only the post-teleport pick uses it; nothing else changes.
-    Unit* SelectNearestTargetExact() const
+    // The candidates are exactly NearestHostileUnitCheck's (within the same centre-distance range, a valid attack
+    // target); only the choice among them changes - one pass, no list.
+    struct NearestExactCheck
     {
-        std::list<Unit*> units;
-        Acore::AnyUnfriendlyUnitInObjectRangeCheck check(me, me, MAX_VISIBILITY_DISTANCE);
-        Acore::UnitListSearcher<Acore::AnyUnfriendlyUnitInObjectRangeCheck> searcher(me, units, check);
-        Cell::VisitObjects(me, searcher, MAX_VISIBILITY_DISTANCE);
+        Creature const* me;
         Unit* best = nullptr;
         float bestDist = 0.0f;
-        for (Unit* u : units)
+        bool operator()(Unit* u)
         {
-            if (!me->IsValidAttackTarget(u))
-                continue;
+            if (!me->IsWithinDistInMap(u, MAX_VISIBILITY_DISTANCE, true, false, false) || !me->IsValidAttackTarget(u))
+                return false;
             float const d = me->GetExactDist(u);
             if (!best || d < bestDist || (d == bestDist && u->GetGUID() < best->GetGUID()))
             {
                 best = u;
                 bestDist = d;
             }
+            return false;  // keep visiting: the searcher never stores anything
         }
-        return best;
+    };
+
+    Unit* SelectNearestTargetExact() const
+    {
+        NearestExactCheck check{me};
+        Unit* unused = nullptr;
+        Acore::UnitLastSearcher<NearestExactCheck> searcher(me, unused, check);
+        Cell::VisitObjects(me, searcher, MAX_VISIBILITY_DISTANCE);
+        return check.best;
     }
 
     void KilledUnit(Unit* victim) override
