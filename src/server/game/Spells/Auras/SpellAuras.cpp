@@ -1137,6 +1137,12 @@ bool Aura::CanBeSaved() const
 {
     SpellInfo const* spellInfo = GetSpellInfo();
 
+    // AzParty transient aura (0026): a module-marked instance is never saved, whatever the spell's attributes.
+    if (m_transient)
+    {
+        return false;
+    }
+
     if (spellInfo->HasAttribute(SPELL_ATTR0_CU_FORCE_AURA_SAVING))
     {
         return true;

@@ -199,6 +199,11 @@ public:
     void AddProcCooldown(SpellProcEntry const* procEntry, TimePoint now);
     void ResetProcCooldown();
     bool IsUsingCharges() const { return m_isUsingCharges; }
+    // AzParty transient aura (0026): this instance is never written to character_aura (CanBeSaved false), so a
+    // module's temporary preparation buff cannot outlive the server process or a logout. One-way; per instance, not per
+    // spell, so the same spell from any other source saves as usual.
+    void SetTransient() { m_transient = true; }
+    [[nodiscard]] bool IsTransient() const { return m_transient; }
     void SetUsingCharges(bool val) { m_isUsingCharges = val; }
     void PrepareProcToTrigger(AuraApplication* aurApp, ProcEventInfo& eventInfo, TimePoint now);
     uint8 GetProcEffectMask(AuraApplication* aurApp, ProcEventInfo& eventInfo, TimePoint now) const;
@@ -279,6 +284,7 @@ protected:
     bool m_isUsingCharges: 1;
 
     TimePoint m_procCooldown;
+    bool m_transient = false;                       // AzParty transient aura (core patch 0026)
 
 private:
     Unit::AuraApplicationList m_removedApplications;
